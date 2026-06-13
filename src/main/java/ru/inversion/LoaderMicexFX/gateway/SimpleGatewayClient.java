@@ -66,7 +66,6 @@ public class SimpleGatewayClient {
     @Value("${app.gateway.board:TQBR}")
     private String board;
 
-    /** До 20 попыток подключения к шлюзу. */
     @Value("${app.gateway.connect-max-attempts:20}")
     private int connectMaxAttempts;
 
@@ -88,7 +87,7 @@ public class SimpleGatewayClient {
             throw new ClientException(APP_ERROR_CODE,
                     "Список буферов пуст (type_src=" + bufferConfigService.getTypeSrc()
                             + ", type_section=" + bufferConfigService.getTypeSection()
-                            + "). Подключитесь к БД до Connect или включите app.loader.buffers.embedded-only=true");
+                            + "). Сначала подключитесь к БД и проверьте tr_buff_target / tr_micex_target");
         }
 
         GatewayConnectionSettings settings = effectiveSettings();
@@ -141,7 +140,7 @@ public class SimpleGatewayClient {
 
         Set<String> boards = parseBoards(board);
         if (boards.isEmpty()) {
-            log.info("Board filter OFF: all boards (etalon ALL)");
+            log.info("Board filter OFF: all boards");
         } else {
             try {
                 client.selectBoards(boards);
@@ -326,15 +325,7 @@ public class SimpleGatewayClient {
         if ("multicast".equalsIgnoreCase(mode) || "colocation".equalsIgnoreCase(mode)) {
             return false;
         }
-        MicexConnectionType ct = s.getConnectionType();
-        if (ct == MicexConnectionType.RS232 || ct == MicexConnectionType.TCP
-                || ct == MicexConnectionType.TCP2 || ct == MicexConnectionType.CUSTOM) {
-            return true;
-        }
-        if ("asts-bridge".equalsIgnoreCase(mode) || "tcp".equalsIgnoreCase(mode) || "tcpip".equalsIgnoreCase(mode)) {
-            return true;
-        }
-        return s.getHost() != null && !s.getHost().isBlank();
+        return true;
     }
 
     
@@ -415,7 +406,6 @@ public class SimpleGatewayClient {
         s.setPassword(password);
         s.setFeedback(feedback);
         s.setConnectionType(MicexConnectionType.TCP2);
-        s.setComBaudrate("115200");
         return s;
     }
 
@@ -465,11 +455,6 @@ public class SimpleGatewayClient {
         s.setPassword(src.getPassword());
         s.setFeedback(src.getFeedback());
         s.setConnectionType(src.getConnectionType());
-        s.setComPort(src.getComPort());
-        s.setComBaudrate(src.getComBaudrate());
-        s.setTcpHost(src.getTcpHost());
-        s.setTcpService(src.getTcpService());
-        s.setCustomConnectText(src.getCustomConnectText());
         return s;
     }
 

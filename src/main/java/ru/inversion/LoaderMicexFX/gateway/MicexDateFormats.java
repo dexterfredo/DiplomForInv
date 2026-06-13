@@ -8,17 +8,13 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
-public final class MicexDateFormats {
+public class MicexDateFormats {
 
     private static final DateTimeFormatter DATE_YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter TIME_HHMMSS = DateTimeFormatter.ofPattern("HHmmss");
     private static final DateTimeFormatter DATETIME_YYYYMMDD_HHMMSS =
             DateTimeFormatter.ofPattern("yyyyMMdd HHmmss");
 
-    private MicexDateFormats() {
-    }
-
-    
     public static String normalizeTradeDate(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
@@ -44,7 +40,6 @@ public final class MicexDateFormats {
         return null;
     }
 
-    
     public static String normalizeTime(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;

@@ -33,7 +33,7 @@ public class LoaderMicexFxApplication {
         Path dll = folder.resolve("mtejni.dll");
         if (!Files.isRegularFile(dll)) {
             System.err.println("MICEX: в каталоге нет mtejni.dll: " + folder.toAbsolutePath());
-            System.err.println("Скопируйте сюда все DLL из дистрибутива MOEX (папка embedded/win64), см. native/win64/README.txt");
+            System.err.println("Скопируйте DLL из дистрибутива MOEX в " + folder.toAbsolutePath() + " (см. native/win64/README.txt)");
             return;
         }
 

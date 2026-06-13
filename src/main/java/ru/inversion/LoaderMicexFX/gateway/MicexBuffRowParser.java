@@ -28,10 +28,10 @@ public class MicexBuffRowParser {
     }
 
     public void mapApiToViewFields(MicexTableRow row, BufferConfig buff, int typeSection) {
-        row.getViewFields().clear();
         if (row == null || row.getFields().isEmpty() || buff == null) {
             return;
         }
+        row.getViewFields().clear();
         int typeBuff = buff.getTypeBuff();
         List<MicexTargetEntry> mapping = targetRepository.loadForBuff(typeBuff, typeSection);
         if (mapping.isEmpty()) {

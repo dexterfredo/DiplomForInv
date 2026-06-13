@@ -13,9 +13,7 @@ public class LoaderUiState {
 
     private boolean lockConnectParams;
     private boolean lockSettingsCheckboxes;
-    
     private boolean lockSettingsStart;
-    
     private boolean lockConnectActions;
 
     private String dealTime = "00:00:00";
@@ -88,7 +86,6 @@ public class LoaderUiState {
         this.lotsizeStarted = lotsizeStarted;
     }
 
-    
     public boolean isSettingsRunning() {
         return decimalStarted || boardStarted;
     }

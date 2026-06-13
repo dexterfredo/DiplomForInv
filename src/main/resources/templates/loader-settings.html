@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/layout :: pageHead('Настройки — ФОНД')}"/>
+</head>
+<body class="fund-app">
+<header class="fund-header">
+    <div th:replace="~{fragments/layout :: topbar(navActive='settings')}"></div>
+</header>
+
+<main class="fund-shell fund-main">
+    <h1 class="fund-page-title fund-page-title--spaced">Параметры загрузчика</h1>
+
+    <div class="fund-panel">
+        <h3>Подключение к шлюзу</h3>
+        <p class="fund-hint">Параметры подключения MTEConnect.</p>
+        <form th:action="@{/connect}" th:object="${gateway}" method="post" id="connectForm">
+            <th:block th:replace="~{fragments/layout :: csrf}"/>
+            <input type="hidden" name="returnTo" value="/loader/settings"/>
+            <input type="hidden" name="connectionType" value="TCP2"/>
+            <input type="hidden" name="loadDecimals" id="hDecimalsConnect" class="h-decimals" value="false"/>
+            <input type="hidden" name="loadBoards" id="hBoardsConnect" class="h-boards" value="false"/>
+            <input type="hidden" name="dealTime" class="h-deal-time" th:value="${ui.dealTime}"/>
+            <input type="hidden" name="quoteTime" class="h-quote-time" th:value="${ui.quoteTime}"/>
+            <input type="hidden" name="settingsTime" class="h-settings-time" th:value="${ui.settingsTime}"/>
+            <input type="hidden" name="dealTimerEnabled" class="h-deal-timer" th:value="${ui.dealTimerEnabled}"/>
+            <div class="fund-field">
+                <label>HOST, SERVER, USER_ID, PASSWORD, INTERFACE, FEEDBACK</label>
+                <textarea th:field="*{connectionText}" th:disabled="${ui.lockConnectParams}"
+                          placeholder="HOST=localhost:15005&#10;SERVER=EQ_TEST&#10;USER_ID=..."></textarea>
+            </div>
+            <div class="fund-btn-toolbar fund-btn-toolbar--center">
+                <button type="submit" class="fund-btn fund-btn-primary"
+                        th:disabled="${status.connected}">Старт</button>
+            </div>
+        </form>
+        <form th:action="@{/disconnect}" method="post" class="fund-btn-toolbar fund-btn-toolbar--center" style="margin-top:10px">
+            <th:block th:replace="~{fragments/layout :: csrf}"/>
+            <input type="hidden" name="returnTo" value="/loader/settings"/>
+            <button type="submit" class="fund-btn fund-btn-outline"
+                    th:disabled="${!status.connected}">Стоп</button>
+        </form>
+        <p th:if="${status.connected}" class="fund-ok fund-text-center">Шлюз подключён</p>
+    </div>
+
+    <div class="fund-panel">
+        <h3>Загружаемые справочники</h3>
+        <form id="prefsForm">
+            <div class="fund-row fund-check fund-row--center">
+                <label>
+                    <input type="checkbox" id="cbDecimals" th:checked="${ui.loadDecimals}"
+                           th:disabled="${ui.lockSettingsCheckboxes}"/>
+                    Decimals (точности)
+                </label>
+                <label>
+                    <input type="checkbox" id="cbBoards" th:checked="${ui.loadBoards}"
+                           th:disabled="${ui.lockSettingsCheckboxes}"/>
+                    Boards (режимы торгов)
+                </label>
+            </div>
+        </form>
+        <form th:action="@{/loader/settings/toggle}" method="post" class="fund-row fund-row--end" style="margin-top:14px" id="formSettings">
+            <th:block th:replace="~{fragments/layout :: csrf}"/>
+            <input type="hidden" name="loadDecimals" class="h-decimals" value="false"/>
+            <input type="hidden" name="loadBoards" class="h-boards" value="false"/>
+            <input type="hidden" name="connectionType" value="TCP2"/>
+            <input type="hidden" name="dealTime" class="h-deal-time" th:value="${ui.dealTime}"/>
+            <input type="hidden" name="quoteTime" class="h-quote-time" th:value="${ui.quoteTime}"/>
+            <input type="hidden" name="settingsTime" class="h-settings-time" th:value="${ui.settingsTime}"/>
+            <input type="hidden" name="dealTimerEnabled" class="h-deal-timer" th:value="${ui.dealTimerEnabled}"/>
+            <label>Интервал настроек
+                <input type="time" id="settingsTimeInput" step="1" th:value="${ui.settingsTime}"
+                       th:disabled="${ui.settingsRunning}" class="fund-input" style="width:auto;margin-left:8px"/>
+            </label>
+            <button type="submit" class="fund-btn"
+                    th:classappend="${ui.settingsRunning} ? ' fund-btn-danger' : ' fund-btn-primary'"
+                    th:disabled="${!status.connected or ui.lockSettingsStart}"
+                    th:text="${ui.settingsButtonLabel}">Старт</button>
+        </form>
+    </div>
+
+    <div class="fund-panel">
+        <h3>Сделки FX (TRADES)</h3>
+        <form th:action="@{/loader/deal/toggle}" method="post" class="fund-row fund-row--end" id="formDeal">
+            <th:block th:replace="~{fragments/layout :: csrf}"/>
+            <input type="hidden" name="loadDecimals" class="h-decimals" value="false"/>
+            <input type="hidden" name="loadBoards" class="h-boards" value="false"/>
+            <input type="hidden" name="connectionType" value="TCP2"/>
+            <input type="hidden" name="dealTime" class="h-deal-time" th:value="${ui.dealTime}"/>
+            <input type="hidden" name="quoteTime" class="h-quote-time" th:value="${ui.quoteTime}"/>
+            <input type="hidden" name="settingsTime" class="h-settings-time" th:value="${ui.settingsTime}"/>
+            <input type="hidden" name="dealTimerEnabled" class="h-deal-timer" th:value="${ui.dealTimerEnabled}"/>
+            <label class="fund-check">
+                <input type="checkbox" id="cbDealTimer" th:checked="${ui.dealTimerEnabled}" th:disabled="${ui.dealStarted}"/>
+                Таймер сделок
+            </label>
+            <label>Интервал
+                <input type="time" id="dealTimeInput" step="1" th:value="${ui.dealTime}"
+                       th:disabled="${ui.dealStarted or !ui.dealTimerEnabled}" class="fund-input" style="width:auto;margin-left:8px"/>
+            </label>
+            <button type="submit" class="fund-btn"
+                    th:classappend="${ui.dealStarted} ? ' fund-btn-danger' : ' fund-btn-primary'"
+                    th:disabled="${!status.connected}"
+                    th:text="${ui.dealButtonLabel}">Старт</button>
+        </form>
+    </div>
+
+    <div class="fund-panel">
+        <h3>Котировки FX (QUOTE_FX)</h3>
+        <form th:action="@{/loader/quote/toggle}" method="post" class="fund-row fund-row--end" id="formQuote">
+            <th:block th:replace="~{fragments/layout :: csrf}"/>
+            <input type="hidden" name="loadDecimals" class="h-decimals" value="false"/>
+            <input type="hidden" name="loadBoards" class="h-boards" value="false"/>
+            <input type="hidden" name="connectionType" value="TCP2"/>
+            <input type="hidden" name="dealTime" class="h-deal-time" th:value="${ui.dealTime}"/>
+            <input type="hidden" name="quoteTime" class="h-quote-time" th:value="${ui.quoteTime}"/>
+            <input type="hidden" name="settingsTime" class="h-settings-time" th:value="${ui.settingsTime}"/>
+            <input type="hidden" name="dealTimerEnabled" class="h-deal-timer" th:value="${ui.dealTimerEnabled}"/>
+            <label>Интервал
+                <input type="time" id="quoteTimeInput" step="1" th:value="${ui.quoteTime}"
+                       th:disabled="${ui.quoteStarted}" class="fund-input" style="width:auto;margin-left:8px"/>
+            </label>
+            <button type="submit" class="fund-btn"
+                    th:classappend="${ui.quoteStarted} ? ' fund-btn-danger' : ' fund-btn-primary'"
+                    th:disabled="${!status.connected}"
+                    th:text="${ui.quoteButtonLabel}">Старт</button>
+        </form>
+    </div>
+</main>
+
+<script th:replace="~{fragments/loader-forms :: syncScript}"></script>
+</body>
+</html>

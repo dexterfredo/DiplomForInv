@@ -10,17 +10,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Properties;
 
-public final class AppHome {
+public class AppHome {
 
     public static final String PROP_HOME = "app.home";
     public static final String PROP_CONFIG = "spring.config.additional-location";
 
     private static volatile Path home;
 
-    private AppHome() {
-    }
-
-    
     public static Path init() {
         if (home != null) {
             return home;
@@ -41,7 +37,6 @@ public final class AppHome {
         return home != null ? home : init();
     }
 
-    
     public static Path resolve(String path) {
         if (path == null || path.isBlank()) {
             return get();
@@ -57,7 +52,6 @@ public final class AppHome {
         return get().resolve("config").resolve("application.properties");
     }
 
-    
     public static Properties loadMergedApplicationProperties() {
         Properties merged = new Properties();
         try (InputStream in = AppHome.class.getClassLoader().getResourceAsStream("application.properties")) {

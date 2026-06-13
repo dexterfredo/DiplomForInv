@@ -12,15 +12,14 @@ import ru.inversion.LoaderMicexFX.gateway.SimpleGatewayClient;
 import ru.inversion.LoaderMicexFX.model.BufferConfig;
 import ru.inversion.LoaderMicexFX.model.ClientStatus;
 import ru.inversion.LoaderMicexFX.model.GatewayConnectionSettings;
-import ru.inversion.LoaderMicexFX.model.MicexConnectionType;
+import ru.inversion.LoaderMicexFX.model.LoaderUiState;
 import ru.inversion.LoaderMicexFX.service.BufferConfigService;
-import ru.inversion.LoaderMicexFX.service.DatabaseConnectionService;
 import ru.inversion.LoaderMicexFX.service.ExchangeWorkerService;
 import ru.inversion.LoaderMicexFX.service.LoaderBufferControlService;
-import ru.inversion.LoaderMicexFX.model.LoaderUiState;
 import ru.inversion.LoaderMicexFX.service.LoaderTimerPreferences;
 
 import java.util.List;
+import java.util.Map;
 
 @Controller
 public class StatusController {
@@ -28,7 +27,6 @@ public class StatusController {
     private final ExchangeWorkerService workerService;
     private final BufferConfigService bufferConfigService;
     private final SimpleGatewayClient gatewayClient;
-    private final DatabaseConnectionService databaseConnectionService;
     private final LoaderBufferControlService bufferControl;
     private final LoaderTimerPreferences timerPreferences;
     private final DbSaveDiagnosticsService dbDiagnostics;
@@ -37,14 +35,12 @@ public class StatusController {
             ExchangeWorkerService workerService,
             BufferConfigService bufferConfigService,
             SimpleGatewayClient gatewayClient,
-            DatabaseConnectionService databaseConnectionService,
             LoaderBufferControlService bufferControl,
             LoaderTimerPreferences timerPreferences,
             DbSaveDiagnosticsService dbDiagnostics) {
         this.workerService = workerService;
         this.bufferConfigService = bufferConfigService;
         this.gatewayClient = gatewayClient;
-        this.databaseConnectionService = databaseConnectionService;
         this.bufferControl = bufferControl;
         this.timerPreferences = timerPreferences;
         this.dbDiagnostics = dbDiagnostics;
@@ -52,28 +48,27 @@ public class StatusController {
 
     @GetMapping("/loader")
     public String loader(Model model) {
-        if (!databaseConnectionService.isConfigured()) {
-            return "redirect:/";
-        }
-        ClientStatus status = workerService.getStatus();
-        GatewayConnectionSettings gw = gatewayClient.getCurrentSettings();
-        model.addAttribute("status", status);
-        model.addAttribute("gateway", gw);
-        model.addAttribute("dbUrl", databaseConnectionService.getCurrent().effectiveJdbcUrl());
-        LoaderUiState ui = bufferControl.buildUiState(status.isSessionReady(), timerPreferences);
-        if (gw.getConnectionType() != null) {
-            ui.setConnectionType(gw.getConnectionType().name());
-        }
-        model.addAttribute("ui", ui);
-        return "status";
+        fillPage(model);
+        return "loader-status";
+    }
+
+    @GetMapping("/loader/settings")
+    public String settings(Model model) {
+        fillPage(model);
+        return "loader-settings";
+    }
+
+    @GetMapping("/loader/data")
+    public String data(Model model) {
+        dbDiagnostics.pollDatabase();
+        fillPage(model);
+        model.addAttribute("dbErrors", dbDiagnostics.getRecentErrors());
+        return "loader-data";
     }
 
     @GetMapping("/api/buffers")
     @ResponseBody
     public List<BufferConfig> buffers() {
-        if (!databaseConnectionService.isConfigured()) {
-            return List.of();
-        }
         return bufferConfigService.getActiveBuffers();
     }
 
@@ -85,10 +80,7 @@ public class StatusController {
 
     @GetMapping("/api/db/diagnostics")
     @ResponseBody
-    public java.util.Map<String, Object> dbDiagnostics() {
-        if (!databaseConnectionService.isConfigured()) {
-            return java.util.Map.of("error", "DB not configured");
-        }
+    public Map<String, Object> dbDiagnostics() {
         dbDiagnostics.pollDatabase();
         return dbDiagnostics.snapshot();
     }
@@ -98,94 +90,81 @@ public class StatusController {
             @ModelAttribute("gateway") GatewayConnectionSettings gateway,
             @RequestParam(value = "loadDecimals", required = false) Boolean loadDecimals,
             @RequestParam(value = "loadBoards", required = false) Boolean loadBoards,
-            @RequestParam(value = "connectionType", required = false) String connectionType,
             @RequestParam(value = "dealTime", required = false) String dealTime,
             @RequestParam(value = "quoteTime", required = false) String quoteTime,
             @RequestParam(value = "settingsTime", required = false) String settingsTime,
-            @RequestParam(value = "dealTimerEnabled", required = false) Boolean dealTimerEnabled) {
-        if (!databaseConnectionService.isConfigured()) {
-            return "redirect:/";
-        }
-        applyFormState(loadDecimals, loadBoards, connectionType, dealTime, quoteTime, settingsTime, dealTimerEnabled);
-        gatewayClient.applyRuntimeSettings(enrichGateway(gateway, connectionType));
+            @RequestParam(value = "dealTimerEnabled", required = false) Boolean dealTimerEnabled,
+            @RequestParam(value = "returnTo", required = false) String returnTo) {
+        saveForm(loadDecimals, loadBoards, dealTime, quoteTime, settingsTime, dealTimerEnabled);
+        GatewayConnectionSettings settings = pickGateway(gateway);
+        gatewayClient.applyRuntimeSettings(settings);
         workerService.startApi();
-        return "redirect:/loader";
+        return redirect(returnTo, "/loader");
     }
 
     @PostMapping("/disconnect")
-    public String disconnect() {
-        if (!databaseConnectionService.isConfigured()) {
-            return "redirect:/";
-        }
+    public String disconnect(@RequestParam(value = "returnTo", required = false) String returnTo) {
         workerService.stopApi();
-        return "redirect:/loader";
+        return redirect(returnTo, "/loader");
     }
 
     @PostMapping("/loader/settings/toggle")
     public String toggleSettings(
             @RequestParam(value = "loadDecimals", required = false) Boolean loadDecimals,
             @RequestParam(value = "loadBoards", required = false) Boolean loadBoards,
-            @RequestParam(value = "connectionType", required = false) String connectionType,
             @RequestParam(value = "dealTime", required = false) String dealTime,
             @RequestParam(value = "quoteTime", required = false) String quoteTime,
             @RequestParam(value = "settingsTime", required = false) String settingsTime,
             @RequestParam(value = "dealTimerEnabled", required = false) Boolean dealTimerEnabled) {
-        return toggleBufferRoute(loadDecimals, loadBoards, connectionType, dealTime, quoteTime, settingsTime, dealTimerEnabled,
-                () -> bufferControl.toggleSettings(workerService.getStatus().isSessionReady()));
+        return doToggle("/loader/settings", loadDecimals, loadBoards, dealTime, quoteTime, settingsTime, dealTimerEnabled,
+                bufferControl.toggleSettings(workerService.getStatus().isConnected()));
     }
 
     @PostMapping("/loader/deal/toggle")
     public String toggleDeal(
             @RequestParam(value = "loadDecimals", required = false) Boolean loadDecimals,
             @RequestParam(value = "loadBoards", required = false) Boolean loadBoards,
-            @RequestParam(value = "connectionType", required = false) String connectionType,
             @RequestParam(value = "dealTime", required = false) String dealTime,
             @RequestParam(value = "quoteTime", required = false) String quoteTime,
             @RequestParam(value = "settingsTime", required = false) String settingsTime,
             @RequestParam(value = "dealTimerEnabled", required = false) Boolean dealTimerEnabled) {
-        return toggleBufferRoute(loadDecimals, loadBoards, connectionType, dealTime, quoteTime, settingsTime, dealTimerEnabled,
-                () -> bufferControl.toggleDeal(workerService.getStatus().isSessionReady()));
+        return doToggle("/loader/settings", loadDecimals, loadBoards, dealTime, quoteTime, settingsTime, dealTimerEnabled,
+                bufferControl.toggleDeal(workerService.getStatus().isConnected()));
     }
 
     @PostMapping("/loader/quote/toggle")
     public String toggleQuote(
             @RequestParam(value = "loadDecimals", required = false) Boolean loadDecimals,
             @RequestParam(value = "loadBoards", required = false) Boolean loadBoards,
-            @RequestParam(value = "connectionType", required = false) String connectionType,
             @RequestParam(value = "dealTime", required = false) String dealTime,
             @RequestParam(value = "quoteTime", required = false) String quoteTime,
             @RequestParam(value = "settingsTime", required = false) String settingsTime,
             @RequestParam(value = "dealTimerEnabled", required = false) Boolean dealTimerEnabled) {
-        return toggleBufferRoute(loadDecimals, loadBoards, connectionType, dealTime, quoteTime, settingsTime, dealTimerEnabled,
-                () -> bufferControl.toggleQuote(workerService.getStatus().isSessionReady()));
+        return doToggle("/loader/settings", loadDecimals, loadBoards, dealTime, quoteTime, settingsTime, dealTimerEnabled,
+                bufferControl.toggleQuote(workerService.getStatus().isConnected()));
     }
 
-    private String toggleBufferRoute(
+    private String doToggle(
+            String page,
             Boolean loadDecimals,
             Boolean loadBoards,
-            String connectionType,
             String dealTime,
             String quoteTime,
             String settingsTime,
             Boolean dealTimerEnabled,
-            java.util.function.Supplier<String> action) {
-        if (!databaseConnectionService.isConfigured()) {
-            return "redirect:/";
-        }
-        applyFormState(loadDecimals, loadBoards, connectionType, dealTime, quoteTime, settingsTime, dealTimerEnabled);
-        String err = action.get();
-        if (err != null) {
-            workerService.getStatus().setLastError(err);
-        } else if (workerService.getStatus().isSessionReady()) {
+            String error) {
+        saveForm(loadDecimals, loadBoards, dealTime, quoteTime, settingsTime, dealTimerEnabled);
+        if (error != null) {
+            workerService.getStatus().setLastError(error);
+        } else if (workerService.getStatus().isConnected()) {
             workerService.runSaveCycle();
         }
-        return "redirect:/loader";
+        return "redirect:" + page;
     }
 
-    private void applyFormState(
+    private void saveForm(
             Boolean loadDecimals,
             Boolean loadBoards,
-            String connectionType,
             String dealTime,
             String quoteTime,
             String settingsTime,
@@ -198,11 +177,26 @@ public class StatusController {
         timerPreferences.applyFromForm(dealTime, quoteTime, settingsTime, dealTimerEnabled);
     }
 
-    private GatewayConnectionSettings enrichGateway(GatewayConnectionSettings gateway, String connectionType) {
-        if (gateway == null) {
-            gateway = new GatewayConnectionSettings();
+    private void fillPage(Model model) {
+        ClientStatus status = workerService.getStatus();
+        model.addAttribute("status", status);
+        model.addAttribute("gateway", gatewayClient.getCurrentSettings());
+        LoaderUiState ui = bufferControl.buildUiState(status.isConnected(), timerPreferences);
+        ui.setConnectionType("TCP2");
+        model.addAttribute("ui", ui);
+    }
+
+    private GatewayConnectionSettings pickGateway(GatewayConnectionSettings submitted) {
+        if (submitted != null && submitted.getConnectionText() != null && !submitted.getConnectionText().isBlank()) {
+            return submitted;
         }
-        gateway.setConnectionType(MicexConnectionType.fromString(connectionType));
-        return gateway;
+        return gatewayClient.getCurrentSettings();
+    }
+
+    private static String redirect(String returnTo, String fallback) {
+        if (returnTo != null && returnTo.startsWith("/loader")) {
+            return "redirect:" + returnTo;
+        }
+        return "redirect:" + fallback;
     }
 }

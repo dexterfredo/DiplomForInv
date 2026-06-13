@@ -7,15 +7,11 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
-public final class MicexFieldConverter {
+public class MicexFieldConverter {
 
     private static final DateTimeFormatter TIME_HHMMSS =
             DateTimeFormatter.ofPattern("HHmmss");
 
-    private MicexFieldConverter() {
-    }
-
-    
     public static String asMicexString(Object value) {
         if (value == null) {
             return "";

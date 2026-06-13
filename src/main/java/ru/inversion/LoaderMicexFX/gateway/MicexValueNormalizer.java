@@ -1,9 +1,6 @@
 package ru.inversion.LoaderMicexFX.gateway;
 
-public final class MicexValueNormalizer {
-
-    private MicexValueNormalizer() {
-    }
+public class MicexValueNormalizer {
 
     public static String normalize(String raw) {
         if (raw == null) {

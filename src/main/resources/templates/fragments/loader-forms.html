@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<body>
+<script th:fragment="syncScript">
+(function () {
+    const cbDec = document.getElementById('cbDecimals');
+    const cbBoard = document.getElementById('cbBoards');
+    const cbDealTimer = document.getElementById('cbDealTimer');
+    const dealTimeInput = document.getElementById('dealTimeInput');
+    const quoteTimeInput = document.getElementById('quoteTimeInput');
+    const settingsTimeInput = document.getElementById('settingsTimeInput');
+
+    function syncHidden() {
+        const d = cbDec && cbDec.checked;
+        const b = cbBoard && cbBoard.checked;
+        document.querySelectorAll('.h-decimals').forEach(el => { el.value = d ? 'true' : 'false'; });
+        document.querySelectorAll('.h-boards').forEach(el => { el.value = b ? 'true' : 'false'; });
+        const hc = document.getElementById('hDecimalsConnect');
+        const hb = document.getElementById('hBoardsConnect');
+        if (hc) hc.value = d ? 'true' : 'false';
+        if (hb) hb.value = b ? 'true' : 'false';
+        if (dealTimeInput) document.querySelectorAll('.h-deal-time').forEach(el => { el.value = dealTimeInput.value; });
+        if (quoteTimeInput) document.querySelectorAll('.h-quote-time').forEach(el => { el.value = quoteTimeInput.value; });
+        if (settingsTimeInput) document.querySelectorAll('.h-settings-time').forEach(el => { el.value = settingsTimeInput.value; });
+        if (cbDealTimer) document.querySelectorAll('.h-deal-timer').forEach(el => { el.value = cbDealTimer.checked ? 'true' : 'false'; });
+    }
+    [cbDec, cbBoard, cbDealTimer, dealTimeInput, quoteTimeInput, settingsTimeInput].forEach(el => {
+        if (el) el.addEventListener('change', syncHidden);
+    });
+    if (cbDealTimer && dealTimeInput) {
+        cbDealTimer.addEventListener('change', () => {
+            if (!cbDealTimer.disabled) dealTimeInput.disabled = !cbDealTimer.checked;
+        });
+    }
+    ['formSettings', 'formDeal', 'formQuote', 'connectForm', 'connectFormQuick'].forEach(id => {
+        const f = document.getElementById(id);
+        if (f) f.addEventListener('submit', syncHidden);
+    });
+    syncHidden();
+})();
+</script>
+</body>
+</html>

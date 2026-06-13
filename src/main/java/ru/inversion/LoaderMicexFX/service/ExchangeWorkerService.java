@@ -3,13 +3,11 @@ package ru.inversion.LoaderMicexFX.service;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import ru.inversion.LoaderMicexFX.gateway.SimpleGatewayClient;
 import ru.inversion.LoaderMicexFX.model.ClientStatus;
 import ru.inversion.LoaderMicexFX.model.MicexTableRow;
-import ru.inversion.LoaderMicexFX.monitoring.LoaderMetricsService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,25 +23,19 @@ public class ExchangeWorkerService {
     private final MicexLoaderService micexLoaderService;
     private final LoaderBufferControlService bufferControl;
     private final TesystimeSyncService tesystimeSyncService;
-    private final LoaderMetricsService loaderMetrics;
     private final ClientStatus status = new ClientStatus();
-
-    @Value("${app.monitor.rows-per-table:40}")
-    private int monitorRowsPerTable;
 
     public ExchangeWorkerService(
             SimpleGatewayClient gatewayClient,
             BufferConfigService bufferConfigService,
             MicexLoaderService micexLoaderService,
             LoaderBufferControlService bufferControl,
-            TesystimeSyncService tesystimeSyncService,
-            LoaderMetricsService loaderMetrics) {
+            TesystimeSyncService tesystimeSyncService) {
         this.gatewayClient = gatewayClient;
         this.bufferConfigService = bufferConfigService;
         this.micexLoaderService = micexLoaderService;
         this.bufferControl = bufferControl;
         this.tesystimeSyncService = tesystimeSyncService;
-        this.loaderMetrics = loaderMetrics;
     }
 
     public synchronized void startApi() {
@@ -52,7 +44,6 @@ public class ExchangeWorkerService {
             return;
         }
         status.setLastError(null);
-        status.clearMonitorBuffers();
         status.setReconnectCount(0);
 
         try {
@@ -74,9 +65,8 @@ public class ExchangeWorkerService {
             gatewayClient.disconnect();
             micexLoaderService.clear();
             status.setConnected(false);
-            status.setLastError(formatError(e));
-        } finally {
-            publishMetrics();
+            status.setLastError(e.getMessage() != null ? e.getMessage() : e.toString());
+            log.warn("Ошибка подключения к MICEX: {}", status.getLastError());
         }
     }
 
@@ -85,14 +75,8 @@ public class ExchangeWorkerService {
         bufferControl.clearAll();
         tesystimeSyncService.reset();
         micexLoaderService.clear();
-        clearSessionStatus();
-        publishMetrics();
-    }
-
-    private void clearSessionStatus() {
         status.setConnected(false);
         status.setLastError(null);
-        status.clearMonitorBuffers();
         status.setOpenedTables(List.of());
         status.setFailedTables(List.of());
         status.setBufferStatuses(List.of());
@@ -104,17 +88,16 @@ public class ExchangeWorkerService {
             if (!gatewayClient.isConnected()) {
                 return;
             }
-            tesystimeSyncService.onMasterTick();
             gatewayClient.refreshTables();
             processMicexRows(gatewayClient.drainMicexTableRows());
         } catch (Exception e) {
-            status.setLastError(formatError(e));
+            status.setLastError(e.getMessage() != null ? e.getMessage() : e.toString());
             if (micexLoaderService.tryReconnect(status)) {
                 try {
                     gatewayClient.refreshTables();
                     processMicexRows(gatewayClient.drainMicexTableRows());
                 } catch (Exception e2) {
-                    status.setLastError(formatError(e2));
+                    status.setLastError(e2.getMessage() != null ? e2.getMessage() : e2.toString());
                     gatewayClient.disconnect();
                     micexLoaderService.clear();
                     status.setConnected(false);
@@ -124,8 +107,6 @@ public class ExchangeWorkerService {
                 micexLoaderService.clear();
                 status.setConnected(false);
             }
-        } finally {
-            publishMetrics();
         }
     }
 
@@ -137,9 +118,7 @@ public class ExchangeWorkerService {
             gatewayClient.refreshTables(true);
             processMicexRows(gatewayClient.drainMicexTableRows());
         } catch (Exception e) {
-            status.setLastError(formatError(e));
-        } finally {
-            publishMetrics();
+            status.setLastError(e.getMessage() != null ? e.getMessage() : e.toString());
         }
     }
 
@@ -156,35 +135,6 @@ public class ExchangeWorkerService {
             status.setLastUpdateAt(Instant.now());
             status.setTotalMessages(status.getTotalMessages() + saved);
         }
-        for (MicexTableRow row : rows) {
-            status.pushEventByTable(MicexRowWebMapper.toMarketData(row), monitorRowsPerTable);
-        }
-    }
-
-    private static String formatError(Throwable e) {
-        StringBuilder sb = new StringBuilder();
-        Throwable t = e;
-        while (t != null) {
-            if (sb.length() > 0) {
-                sb.append(" | ");
-            }
-            String m = t.getMessage();
-            if (m != null && !m.isBlank()) {
-                sb.append(m);
-            } else {
-                sb.append(t.getClass().getSimpleName());
-            }
-            t = t.getCause();
-            if (sb.length() > 500) {
-                sb.append("...");
-                break;
-            }
-        }
-        return sb.toString();
-    }
-
-    private void publishMetrics() {
-        loaderMetrics.refreshStatus(status);
     }
 
     public synchronized ClientStatus getStatus() {

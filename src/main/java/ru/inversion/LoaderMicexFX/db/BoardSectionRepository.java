@@ -9,9 +9,6 @@ import org.springframework.stereotype.Repository;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * type_section площадки из справочника v_tf_dict_board.
- */
 @Repository
 public class BoardSectionRepository {
 
@@ -37,7 +34,6 @@ public class BoardSectionRepository {
         this.jdbc = jdbcTemplate;
     }
 
-    /** null — площадка не найдена в справочнике. */
     public Integer resolveTypeSection(String boardCode) {
         if (boardCode == null || boardCode.isBlank()) {
             return null;

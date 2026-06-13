@@ -15,7 +15,6 @@ public class MicexTextFieldBuilder {
         this.schemaRegistry = schemaRegistry;
     }
 
-    
     public String buildFromApiRow(MicexTableRow row) {
         if (row == null || row.getTableName() == null) {
             return null;

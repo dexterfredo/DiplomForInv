@@ -2,11 +2,12 @@ logs/
 !logs/README.txt
 target/
 dist/
-native/win64/mtesrl_*_stats.log
+native/win64/mtesrl_*.log
+config/application.properties
+settings-local.xml
 maven/apache-maven-3.9.14-bin.zip
 maven-repository/
 !maven-repository/README.txt
-src/main/java/embedded/**/*.log
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

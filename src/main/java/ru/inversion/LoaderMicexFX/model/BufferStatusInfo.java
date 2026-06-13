@@ -9,9 +9,7 @@ public class BufferStatusInfo {
     private int pollIntervalSec;
     private long rowsSaved;
     private Instant lastSaveAt;
-    
     private String saveState;
-    
     private boolean started;
 
     public int getTypeBuff() {

@@ -4,12 +4,9 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
-public final class TimerIntervalParser {
+public class TimerIntervalParser {
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("H:mm[:ss]");
-
-    private TimerIntervalParser() {
-    }
 
     public static int toIntervalSeconds(String timeOfDay) {
         if (timeOfDay == null || timeOfDay.isBlank()) {

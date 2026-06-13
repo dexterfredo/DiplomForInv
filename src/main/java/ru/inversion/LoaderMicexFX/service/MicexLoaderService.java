@@ -73,16 +73,10 @@ public class MicexLoaderService {
         this.dbDiagnostics = dbDiagnostics;
     }
 
-    
     public void initAfterConnect(ClientStatus status) {
-        initAfterConnect(status, null);
-    }
-
-    public void initAfterConnect(ClientStatus status, List<String> openedTablesOverride) {
         runtimeBuffers.clear();
         openedTableSet.clear();
-        List<String> source = openedTablesOverride != null ? openedTablesOverride : gatewayClient.getOpenedTables();
-        for (String t : source) {
+        for (String t : gatewayClient.getOpenedTables()) {
             if (t != null) {
                 openedTableSet.add(t.toUpperCase());
             }
@@ -113,7 +107,6 @@ public class MicexLoaderService {
         openedTableSet.clear();
     }
 
-    
     public void prepareBuffersStarted(int... typeBuffs) {
         if (typeBuffs == null || typeBuffs.length == 0) {
             return;
@@ -133,7 +126,6 @@ public class MicexLoaderService {
         syncBufferStatusInternal(status);
     }
 
-    
     public int saveRowsWithIntervals(List<MicexTableRow> allRows, ClientStatus status) {
         if (allRows == null || allRows.isEmpty()) {
             syncBufferStatusInternal(status);
@@ -172,8 +164,9 @@ public class MicexLoaderService {
                 continue;
             }
 
-            int intervalSec = timerPreferences.getIntervalSecFor(buff.getTypeBuff(), loaderConstants);
-            boolean quoteBuff = loaderConstants.isBuffQuote(buff.getTypeBuff());
+            BufferConfig buffCfg = buff.getConfig();
+            int intervalSec = timerPreferences.getIntervalSecFor(buffCfg);
+            boolean quoteBuff = buffCfg.isQuoteBuffer();
             boolean snapshotBatch = buff.pendingHasSnapshot();
 
             if (!snapshotBatch && !buff.shouldRefreshCycle(intervalSec, quoteBuff)) {
@@ -190,9 +183,9 @@ public class MicexLoaderService {
 
             int n;
             int skipped = 0;
-            if (buff.getTypeBuff() == loaderConstants.buffMicexDeal()) {
+            if (buffCfg.isMultiLegDealSave()) {
                 n = micexRowRepository.saveDealFxChunk(
-                        buff.getConfig(),
+                        buffCfg,
                         chunk,
                         row -> passBoardFilter(row) && passSecurityFilter(row, buff.getConfig()));
             } else {
@@ -231,7 +224,7 @@ public class MicexLoaderService {
                 saved += n;
                 log.info("DB saved: {} — {} rows (filtered out: {})",
                         formatBufferRoute(buff.getConfig(), table), n, skipped);
-            } else if (!chunk.isEmpty() && buff.getTypeBuff() == loaderConstants.buffMicexDeal()) {
+            } else if (!chunk.isEmpty() && buffCfg.isMultiLegDealSave()) {
                 log.info("DB saved: {} — 0 rows from chunk {}",
                         formatBufferRoute(buff.getConfig(), table), chunk.size());
             }
@@ -242,7 +235,6 @@ public class MicexLoaderService {
         return saved;
     }
 
-    
     private int saveRowsDirect(Map<String, List<MicexTableRow>> byTable, ClientStatus status) {
         int saved = 0;
         for (Map.Entry<String, List<MicexTableRow>> e : byTable.entrySet()) {
@@ -252,7 +244,7 @@ public class MicexLoaderService {
                 continue;
             }
             int n;
-            if (cfg.getTypeBuff() == loaderConstants.buffMicexDeal()) {
+            if (cfg.isMultiLegDealSave()) {
                 n = micexRowRepository.saveDealFxChunk(
                         cfg,
                         e.getValue(),
@@ -280,7 +272,6 @@ public class MicexLoaderService {
         return saved;
     }
 
-    
     private void syncDbDiagnostics(ClientStatus status) {
         status.setLastDbError(dbDiagnostics.getLastDbError());
         status.setLastDbErrorAt(dbDiagnostics.getLastDbErrorAt());
@@ -292,12 +283,11 @@ public class MicexLoaderService {
         return passBoardFilter(row) && passSecurityFilter(row, cfg);
     }
 
-    
     private boolean isSectionSecurityBuffer(BufferConfig cfg) {
         if (cfg == null) {
             return false;
         }
-        if (loaderConstants.isBuffFxQuote(cfg.getTypeBuff())) {
+        if (cfg.isFxQuoteBuffer()) {
             return false;
         }
         return loaderConstants.isMmvSectionSecurityMarket();
@@ -319,7 +309,6 @@ public class MicexLoaderService {
         return boardFilterRepository.isAllowed(secboard);
     }
 
-    
     private boolean passSecurityFilter(MicexTableRow row, BufferConfig cfg) {
         if (!securityFilterRepository.isEnabled()) {
             return true;
@@ -356,7 +345,6 @@ public class MicexLoaderService {
         return null;
     }
 
-    
     public boolean tryReconnect(ClientStatus status) {
         if (!reconnectOnError) {
             return false;
@@ -378,22 +366,23 @@ public class MicexLoaderService {
                 return true;
             } catch (Exception e) {
                 log.warn("Переподключение не удалось: {}", e.getMessage());
-                status.setLastError("Переподключение " + attempt + " FAIL: " + e.getMessage());
+                String msg = "Переподключение " + attempt + " FAIL: " + e.getMessage();
+                status.setLastError(msg);
             }
         }
         status.setConnected(false);
         return false;
     }
 
-    
     private void syncBufferStatusInternal(ClientStatus status) {
         List<BufferStatusInfo> list = new ArrayList<>();
         for (MicexBuffer b : runtimeBuffers) {
             BufferStatusInfo info = new BufferStatusInfo();
             info.setTypeBuff(b.getTypeBuff());
             info.setMicexTable(b.getMicexTable());
-            int interval = timerPreferences.getIntervalSecFor(b.getTypeBuff(), loaderConstants);
-            boolean quoteBuff = loaderConstants.isBuffQuote(b.getTypeBuff());
+            BufferConfig cfg = b.getConfig();
+            int interval = timerPreferences.getIntervalSecFor(cfg);
+            boolean quoteBuff = cfg.isQuoteBuffer();
             info.setPollIntervalSec(interval);
             info.setRowsSaved(b.getRowsSaved());
             Instant last = b.getLastSaveAt();
@@ -405,7 +394,6 @@ public class MicexLoaderService {
         status.setBufferStatuses(list);
     }
 
-    
     private String formatBufferRoute(BufferConfig cfg, String micexTable) {
         if (cfg == null) {
             return "MICEX " + (micexTable == null ? "?" : micexTable.toUpperCase());
@@ -419,51 +407,25 @@ public class MicexLoaderService {
     }
 
     private String bufferKindLabel(BufferConfig cfg) {
-        int t = cfg.getTypeBuff();
-        if (t == loaderConstants.buffMicexDecimal()) {
-            return "DECIMAL";
-        }
-        if (t == loaderConstants.buffMicexBoard()) {
-            return "BOARD";
-        }
-        if (t == loaderConstants.buffMicexDeal()) {
-            return "DEAL_FX";
-        }
-        if (t == loaderConstants.buffMicexQuoteFx()) {
-            return "QUOTE_FX";
-        }
-        if (t == loaderConstants.buffMicexLotsize()) {
-            return "LOTSIZE";
-        }
-        if (t == loaderConstants.buffMicexDealSec()) {
-            return "DEAL_SEC";
-        }
-        if (t == loaderConstants.buffMicexQuoteSec()) {
-            return "QUOTE_SEC";
-        }
-        if (t == loaderConstants.buffMicexOrderSec()) {
-            return "ORDER_SEC";
-        }
-        return "BUFF_" + t;
+        String kind = cfg.getBufferKind();
+        return kind == null || kind.isBlank() ? "BUFF_" + cfg.getTypeBuff() : kind;
     }
 
     private record SaveTarget(BufferConfig config, int typeSection, boolean remap) {
     }
 
-    /**
-     * Маршрутизация по type_section площадки (v_tf_dict_board):
-     * FX quote 5922 → 6246, фондовые котировки → 2325/1775, board/decimal — section площадки.
-     */
     private List<SaveTarget> resolveSaveTargets(BufferConfig buff, MicexTableRow row) {
-        int typeBuff = buff.getTypeBuff();
         int loaderSection = loaderConstants.getTypeSection();
         Integer boardSection = resolveBoardSection(row);
 
-        if (typeBuff == loaderConstants.buffMicexQuoteFx()) {
+        if (buff.isQuoteBuffer()) {
+            if (buff.isSecQuoteBuffer()) {
+                return List.of(new SaveTarget(buff, loaderSection, false));
+            }
             SaveTarget quote = routeQuoteTarget(boardSection, loaderSection);
             return quote != null ? List.of(quote) : List.of();
         }
-        if (typeBuff == loaderConstants.buffMicexDecimal() || typeBuff == loaderConstants.buffMicexBoard()) {
+        if (buff.isDecimalBuffer() || buff.isBoardBuffer()) {
             int section = boardSection != null ? boardSection : loaderSection;
             return List.of(new SaveTarget(buff, section, false));
         }
@@ -472,11 +434,11 @@ public class MicexLoaderService {
 
     private SaveTarget routeQuoteTarget(Integer boardSection, int loaderSection) {
         if (boardSection == null || boardSection == loaderSection) {
-            BufferConfig fx = bufferConfigService.findByTypeBuff(loaderConstants.buffMicexQuoteFx());
+            BufferConfig fx = bufferConfigService.findFxQuoteBuffer();
             return fx != null ? new SaveTarget(fx, loaderSection, false) : null;
         }
         if (boardSection == loaderConstants.sectState() || boardSection == loaderConstants.sectShare()) {
-            BufferConfig sec = bufferConfigService.findByTypeBuff(loaderConstants.buffMicexQuoteSec());
+            BufferConfig sec = bufferConfigService.findSecQuoteBuffer();
             if (sec == null) {
                 return null;
             }

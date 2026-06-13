@@ -12,11 +12,7 @@ import java.util.Properties;
 
 public class AppHomeEnvironmentPostProcessor implements EnvironmentPostProcessor {
 
-    private static final List<String> PATH_PROPERTIES = List.of(
-            "app.micex.native.dir",
-            "app.data.file.path",
-            "app.data.file.raw",
-            "app.data.file.template");
+    private static final List<String> PATH_PROPERTIES = List.of("app.micex.native.dir");
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {

@@ -3,17 +3,7 @@ package ru.inversion.LoaderMicexFX.model;
 public class GatewayConnectionSettings {
 
     private MicexConnectionType connectionType = MicexConnectionType.TCP2;
-    
-    private String comPort;
-    private String comBaudrate;
-    
-    private String tcpHost;
-    private String tcpService;
-    
-    private String customConnectText;
-
     private String packetSize;
-    
     private String host;
     private String apiInterface;
     private String server;
@@ -22,10 +12,16 @@ public class GatewayConnectionSettings {
     private String prefBroadcast;
     private String userId;
     private String password;
-    
     private String feedback;
-    
     private String connectionText;
+
+    public MicexConnectionType getConnectionType() {
+        return connectionType;
+    }
+
+    public void setConnectionType(MicexConnectionType connectionType) {
+        this.connectionType = connectionType;
+    }
 
     public String getPacketSize() {
         return packetSize;
@@ -35,20 +31,20 @@ public class GatewayConnectionSettings {
         this.packetSize = packetSize;
     }
 
-    public String getApiInterface() {
-        return apiInterface;
-    }
-
-    public void setApiInterface(String apiInterface) {
-        this.apiInterface = apiInterface;
-    }
-
     public String getHost() {
         return host;
     }
 
     public void setHost(String host) {
         this.host = host;
+    }
+
+    public String getApiInterface() {
+        return apiInterface;
+    }
+
+    public void setApiInterface(String apiInterface) {
+        this.apiInterface = apiInterface;
     }
 
     public String getServer() {
@@ -113,53 +109,5 @@ public class GatewayConnectionSettings {
 
     public void setConnectionText(String connectionText) {
         this.connectionText = connectionText;
-    }
-
-    public MicexConnectionType getConnectionType() {
-        return connectionType;
-    }
-
-    public void setConnectionType(MicexConnectionType connectionType) {
-        this.connectionType = connectionType;
-    }
-
-    public String getComPort() {
-        return comPort;
-    }
-
-    public void setComPort(String comPort) {
-        this.comPort = comPort;
-    }
-
-    public String getComBaudrate() {
-        return comBaudrate;
-    }
-
-    public void setComBaudrate(String comBaudrate) {
-        this.comBaudrate = comBaudrate;
-    }
-
-    public String getTcpHost() {
-        return tcpHost;
-    }
-
-    public void setTcpHost(String tcpHost) {
-        this.tcpHost = tcpHost;
-    }
-
-    public String getTcpService() {
-        return tcpService;
-    }
-
-    public void setTcpService(String tcpService) {
-        this.tcpService = tcpService;
-    }
-
-    public String getCustomConnectText() {
-        return customConnectText;
-    }
-
-    public void setCustomConnectText(String customConnectText) {
-        this.customConnectText = customConnectText;
     }
 }

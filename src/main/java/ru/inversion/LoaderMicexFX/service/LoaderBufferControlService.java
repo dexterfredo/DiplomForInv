@@ -6,11 +6,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import ru.inversion.LoaderMicexFX.loaderconfig.BufferDependents;
+import ru.inversion.LoaderMicexFX.model.BufferConfig;
 import ru.inversion.LoaderMicexFX.model.LoaderUiState;
 
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -19,6 +21,7 @@ public class LoaderBufferControlService {
     private static final Logger log = LoggerFactory.getLogger(LoaderBufferControlService.class);
 
     private final LoaderConstantsService constants;
+    private final BufferConfigService bufferConfigService;
     private final MicexLoaderService micexLoaderService;
 
     @Value("${app.loader.ui.load-decimals:true}")
@@ -31,8 +34,12 @@ public class LoaderBufferControlService {
     private volatile boolean loadBoards;
     private final Set<Integer> startedBuffers = Collections.synchronizedSet(new HashSet<>());
 
-    public LoaderBufferControlService(LoaderConstantsService constants, @Lazy MicexLoaderService micexLoaderService) {
+    public LoaderBufferControlService(
+            LoaderConstantsService constants,
+            BufferConfigService bufferConfigService,
+            @Lazy MicexLoaderService micexLoaderService) {
         this.constants = constants;
+        this.bufferConfigService = bufferConfigService;
         this.micexLoaderService = micexLoaderService;
     }
 
@@ -68,69 +75,79 @@ public class LoaderBufferControlService {
         log.info("Все буферы остановлены (отключение MICEX API)");
     }
 
-    
-    public synchronized String toggleSettings(boolean sessionReady) {
-        if (!sessionReady) {
+    public synchronized String toggleSettings(boolean micexConnected) {
+        if (!micexConnected) {
             return "Сначала подключитесь к MICEX (Connect).";
         }
         if (!loadDecimals && !loadBoards) {
             return "Включите галочку Decimals и/или Boards.";
         }
-        int decimal = constants.buffMicexDecimal();
-        int board = constants.buffMicexBoard();
-        if (isBufferStarted(decimal) || isBufferStarted(board)) {
-            stopBuffer(board);
-            stopBuffer(decimal);
+        Optional<BufferConfig> decimal = bufferConfigService.findDecimalBuffer();
+        Optional<BufferConfig> board = bufferConfigService.findBoardBuffer();
+        if (decimal.isEmpty() && board.isEmpty()) {
+            return "В БД нет буферов decimal/board (tr_buff_target).";
+        }
+        boolean decimalStarted = decimal.map(b -> isBufferStarted(b.getTypeBuff())).orElse(false);
+        boolean boardStarted = board.map(b -> isBufferStarted(b.getTypeBuff())).orElse(false);
+        if (decimalStarted || boardStarted) {
+            board.ifPresent(b -> stopBuffer(b.getTypeBuff()));
+            decimal.ifPresent(b -> stopBuffer(b.getTypeBuff()));
             log.info("Остановлены буферы настроек: board, decimal");
             return null;
         }
         if (loadBoards) {
-            startBuffer(board);
+            board.ifPresent(b -> startBuffer(b.getTypeBuff()));
         }
         if (loadDecimals) {
-            startBuffer(decimal);
+            decimal.ifPresent(b -> startBuffer(b.getTypeBuff()));
         }
         log.info("Запущены буферы настроек (decimals={}, boards={})", loadDecimals, loadBoards);
         return null;
     }
 
-    
-    public synchronized String toggleDeal(boolean sessionReady) {
-        if (!sessionReady) {
+    public synchronized String toggleDeal(boolean micexConnected) {
+        if (!micexConnected) {
             return "Сначала подключитесь к MICEX (Connect).";
         }
-        int deal = constants.buffMicexDeal();
-        if (isBufferStarted(deal)) {
-            stopBuffer(deal);
-            stopDependents(deal);
-            log.info("Остановлен буфер сделок {}", deal);
+        Optional<BufferConfig> deal = bufferConfigService.findDealBuffer();
+        if (deal.isEmpty()) {
+            return "В БД нет буфера сделок DEAL_FX (tr_buff_target).";
+        }
+        int dealId = deal.get().getTypeBuff();
+        if (isBufferStarted(dealId)) {
+            stopBuffer(dealId);
+            stopDependents(dealId);
+            log.info("Остановлен буфер сделок {}", dealId);
             return null;
         }
-        if (!startDependents(deal)) {
+        if (!startDependents(dealId)) {
             return "Не удалось запустить зависимые буферы (board/decimal).";
         }
-        startBuffer(deal);
-        log.info("Запущен буфер сделок {}", deal);
+        startBuffer(dealId);
+        log.info("Запущен буфер сделок {}", dealId);
         return null;
     }
 
-    
-    public synchronized String toggleQuote(boolean sessionReady) {
-        if (!sessionReady) {
+    public synchronized String toggleQuote(boolean micexConnected) {
+        if (!micexConnected) {
             return "Сначала подключитесь к MICEX (Connect).";
         }
-        int quote = constants.buffMicexQuoteFx();
-        if (isBufferStarted(quote)) {
-            stopBuffer(quote);
-            stopDependents(quote);
-            log.info("Остановлен буфер котировок {}", quote);
+        Optional<BufferConfig> quote = bufferConfigService.findPrimaryQuoteBuffer();
+        if (quote.isEmpty()) {
+            return "В БД нет буфера котировок (tr_buff_target).";
+        }
+        int quoteId = quote.get().getTypeBuff();
+        if (isBufferStarted(quoteId)) {
+            stopBuffer(quoteId);
+            stopDependents(quoteId);
+            log.info("Остановлен буфер котировок {}", quoteId);
             return null;
         }
-        if (!startDependents(quote)) {
+        if (!startDependents(quoteId)) {
             return "Не удалось запустить зависимые буферы (board/decimal).";
         }
-        startBuffer(quote);
-        log.info("Запущен буфер котировок {}", quote);
+        startBuffer(quoteId);
+        log.info("Запущен буфер котировок {}", quoteId);
         return null;
     }
 
@@ -145,14 +162,16 @@ public class LoaderBufferControlService {
         ui.setLoadDecimals(loadDecimals);
         ui.setLoadBoards(loadBoards);
         ui.setMicexConnected(micexConnected);
-        int deal = constants.buffMicexDeal();
-        int quote = constants.buffMicexQuoteFx();
-        int decimal = constants.buffMicexDecimal();
-        int board = constants.buffMicexBoard();
-        ui.setDealStarted(isBufferStarted(deal));
-        ui.setQuoteStarted(isBufferStarted(quote));
-        ui.setDecimalStarted(isBufferStarted(decimal));
-        ui.setBoardStarted(isBufferStarted(board));
+
+        Optional<BufferConfig> deal = bufferConfigService.findDealBuffer();
+        Optional<BufferConfig> quote = bufferConfigService.findPrimaryQuoteBuffer();
+        Optional<BufferConfig> decimal = bufferConfigService.findDecimalBuffer();
+        Optional<BufferConfig> board = bufferConfigService.findBoardBuffer();
+
+        ui.setDealStarted(deal.map(b -> isBufferStarted(b.getTypeBuff())).orElse(false));
+        ui.setQuoteStarted(quote.map(b -> isBufferStarted(b.getTypeBuff())).orElse(false));
+        ui.setDecimalStarted(decimal.map(b -> isBufferStarted(b.getTypeBuff())).orElse(false));
+        ui.setBoardStarted(board.map(b -> isBufferStarted(b.getTypeBuff())).orElse(false));
 
         boolean settingsRunning = ui.isSettingsRunning();
         boolean dealOrQuote = ui.isDealStarted() || ui.isQuoteStarted();
@@ -172,7 +191,6 @@ public class LoaderBufferControlService {
         startedBuffers.remove(typeBuff);
     }
 
-    
     private boolean startDependents(int masterTypeBuff) {
         List<Integer> deps = dependentTypes(masterTypeBuff);
         for (int dep : deps) {
@@ -199,13 +217,12 @@ public class LoaderBufferControlService {
     }
 
     private boolean isUsedByOtherRunningMaster(int depTypeBuff, int stoppingMaster) {
-        int deal = constants.buffMicexDeal();
-        int quote = constants.buffMicexQuoteFx();
-        for (int master : List.of(deal, quote)) {
-            if (master == stoppingMaster || !isBufferStarted(master)) {
+        for (BufferConfig master : bufferConfigService.findMasterBuffers()) {
+            int masterId = master.getTypeBuff();
+            if (masterId == stoppingMaster || !isBufferStarted(masterId)) {
                 continue;
             }
-            if (dependentTypes(master).contains(depTypeBuff)) {
+            if (dependentTypes(masterId).contains(depTypeBuff)) {
                 return true;
             }
         }
@@ -213,22 +230,22 @@ public class LoaderBufferControlService {
     }
 
     private List<Integer> dependentTypes(int masterTypeBuff) {
+        BufferConfig master = bufferConfigService.findByTypeBuff(masterTypeBuff);
         return BufferDependents.forMaster(
-                masterTypeBuff,
-                constants.buffMicexDeal(),
-                constants.buffMicexQuoteFx(),
-                constants.buffMicexBoard(),
-                constants.buffMicexDecimal(),
-                constants.buffMicexLotsize(),
+                master,
+                bufferConfigService.getActiveBuffers(),
                 constants.isMmvSectionSecurityMarket());
     }
 
-    
     private boolean canEnableBuffer(int typeBuff) {
-        if (typeBuff == constants.buffMicexDecimal()) {
+        BufferConfig cfg = bufferConfigService.findByTypeBuff(typeBuff);
+        if (cfg == null) {
+            return true;
+        }
+        if (cfg.isDecimalBuffer()) {
             return loadDecimals;
         }
-        if (typeBuff == constants.buffMicexBoard()) {
+        if (cfg.isBoardBuffer()) {
             return loadBoards;
         }
         return true;

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="dbErrors(title)">
+    <h2 class="fund-section-title" th:text="${title}">Ошибки БД</h2>
+    <p class="fund-hint" th:if="${dbErrors == null or dbErrors.isEmpty()}">Ошибок записи в БД нет.</p>
+    <div th:each="err : ${dbErrors}" class="error-item">
+        <div class="error-msg" th:text="${err.message}">ошибка</div>
+        <div class="error-meta" th:if="${err.repeatCount > 1}">
+            буфер <span th:text="${err.typeBuff}"></span>
+            · повторений: <span th:text="${err.repeatCount}"></span>
+            · <span th:text="${err.firstAt != null ? #temporals.format(err.firstAt, 'dd.MM.yyyy HH:mm:ss') : '-'}"></span>
+        </div>
+        <div class="error-meta" th:if="${err.repeatCount <= 1 and err.firstAt != null}">
+            буфер <span th:text="${err.typeBuff}"></span>
+            · <span th:text="${#temporals.format(err.firstAt, 'dd.MM.yyyy HH:mm:ss')}"></span>
+        </div>
+        <details th:if="${err.hasStackTrace()}" class="error-stack-details">
+            <summary class="error-stack-toggle">Показать стек</summary>
+            <pre class="stack" th:text="${err.stackTrace}"></pre>
+        </details>
+    </div>
+</th:block>
+</body>
+</html>

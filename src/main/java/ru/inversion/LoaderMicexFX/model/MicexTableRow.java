@@ -7,9 +7,7 @@ import java.util.Map;
 public class MicexTableRow {
 
     private String tableName;
-    
     private final Map<String, Object> fields = new LinkedHashMap<>();
-    
     private final Map<String, String> viewFields = new LinkedHashMap<>();
     private boolean snapshot;
     private Instant receivedAt = Instant.now();
@@ -54,7 +52,6 @@ public class MicexTableRow {
         }
     }
 
-    /** Копия полей API для повторного маппинга в другой type_buff/section. */
     public MicexTableRow copyForRemap() {
         MicexTableRow copy = new MicexTableRow();
         copy.setTableName(tableName);

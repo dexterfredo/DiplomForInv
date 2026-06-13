@@ -19,11 +19,9 @@ public class BoardFilterRepository {
 
     private final JdbcTemplate jdbc;
 
-    
     @Value("${app.gateway.board:ALL}")
     private String boardConfig;
 
-    
     @Value("${app.loader.board.if-load-exch-data:81}")
     private int ifLoadExchDataTrue;
 
@@ -71,7 +69,7 @@ public class BoardFilterRepository {
                     ifLoadExchDataTrue, fromView.size());
         }
         if (fromView.isEmpty()) {
-            log.warn("Нет площадок после фильтра. Проверьте seed 21_seed_tf_dict_and_micex_board.sql и v_tf_dict_board");
+            log.warn("Нет площадок после фильтра (v_tf_dict_board)");
             if (!explicit.isEmpty()) {
                 return explicit;
             }
@@ -79,7 +77,6 @@ public class BoardFilterRepository {
         return fromView;
     }
 
-    
     private Set<String> loadFromView() {
         try {
             List<String> list = jdbc.queryForList(
@@ -101,7 +98,6 @@ public class BoardFilterRepository {
         }
     }
 
-    
     static Set<String> parseExplicitBoards(String config) {
         String raw = config == null ? "" : config.trim();
         if (raw.isEmpty() || "ALL".equalsIgnoreCase(raw) || "*".equals(raw)) {

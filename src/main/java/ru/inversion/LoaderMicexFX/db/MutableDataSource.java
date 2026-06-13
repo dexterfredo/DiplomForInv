@@ -24,7 +24,7 @@ public class MutableDataSource extends AbstractDataSource {
     public Connection getConnection() throws SQLException {
         DataSource ds = target.get();
         if (ds == null) {
-            throw new SQLException("База данных не настроена. Откройте начальную страницу и нажмите «Подключиться».");
+            throw new SQLException("База данных не настроена. Войдите на /login (логин и пароль PostgreSQL).");
         }
         return ds.getConnection();
     }

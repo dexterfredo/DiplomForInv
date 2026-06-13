@@ -22,7 +22,6 @@ public class SecurityFilterRepository {
     private boolean filterEnabled;
 
     private volatile Set<String> allowedSecCodes;
-    
     private volatile boolean dictionaryLoaded;
 
     public SecurityFilterRepository(JdbcTemplate jdbcTemplate) {
@@ -88,7 +87,7 @@ public class SecurityFilterRepository {
             dictionaryLoaded = true;
             log.info("Фильтр seccode: v_tr_dict_sec — {} инструментов", allowedSecCodes.size());
             if (allowedSecCodes.isEmpty()) {
-                log.warn("Справочник пуст. Проверьте 22_seed_tr_dict_cat_sec.sql и v_tr_dict_sec");
+                log.warn("Справочник инструментов пуст (v_tr_dict_sec)");
             }
         } catch (Exception e) {
             allowedSecCodes = Set.of();

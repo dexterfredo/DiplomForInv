@@ -1,36 +1,29 @@
 package ru.inversion.LoaderMicexFX.gateway;
 
 import ru.inversion.LoaderMicexFX.model.BufferConfig;
-import ru.inversion.LoaderMicexFX.service.LoaderConstantsService;
 import ru.inversion.LoaderMicexFX.service.TesystimeSyncService;
 
 import java.util.ArrayList;
 import java.util.Map;
 
-public final class MicexBuffDefaults {
-
-    private MicexBuffDefaults() {
-    }
+public class MicexBuffDefaults {
 
     public static void apply(
             BufferConfig buff,
             Map<String, String> viewFields,
-            TesystimeSyncService tesystimeSyncService,
-            LoaderConstantsService constants) {
+            TesystimeSyncService tesystimeSyncService) {
         if (buff == null || viewFields == null || viewFields.isEmpty()) {
             return;
         }
         normalizeMicexDates(viewFields);
-        int typeBuff = buff.getTypeBuff();
-        if (typeBuff == constants.buffMicexQuoteFx() || typeBuff == constants.buffMicexQuoteSec()) {
+        if (buff.isQuoteBuffer()) {
             applyTradeDateFromTesystime(viewFields, tesystimeSyncService);
         }
-        if (typeBuff == constants.buffMicexOrderSec()) {
+        if (buff.isOrderBuffer()) {
             applyOrderDateFromTesystime(viewFields, tesystimeSyncService);
         }
     }
 
-    
     public static void normalizeMicexDates(Map<String, String> viewFields) {
         for (Map.Entry<String, String> e : new ArrayList<>(viewFields.entrySet())) {
             if (e.getValue() == null || e.getValue().isBlank()) {
@@ -51,7 +44,6 @@ public final class MicexBuffDefaults {
         }
     }
 
-    
     private static void applyTradeDateFromTesystime(
             Map<String, String> viewFields,
             TesystimeSyncService tesystimeSyncService) {
@@ -69,7 +61,6 @@ public final class MicexBuffDefaults {
         viewFields.put("raw_tradedate", date);
     }
 
-    
     private static void applyOrderDateFromTesystime(
             Map<String, String> viewFields,
             TesystimeSyncService tesystimeSyncService) {

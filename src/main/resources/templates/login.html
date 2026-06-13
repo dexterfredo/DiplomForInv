@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — ФОНД. Универсальный поток</title>
+    <link rel="stylesheet" th:href="@{/css/fund.css}"/>
+</head>
+<body class="fund-login">
+<div class="fund-login-card">
+    <a class="fund-login-brand" th:href="@{/loader}" title="Состояние загрузчика">
+        <div class="fund-login-logo">
+            <img th:src="@{/img/logomini2.png}" alt="Логотип" width="48" height="48"/>
+        </div>
+        <p class="fund-login-title">ФОНД. Универсальный поток</p>
+    </a>
+
+    <p th:if="${message}" class="fund-login-msg" th:text="${message}"></p>
+
+    <form th:action="@{/login}" method="post">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <div class="fund-login-field">
+            <span class="icon">&#128100;</span>
+            <input id="username" type="text" name="username" placeholder="Логин" autocomplete="username" required
+                   th:value="${defaultUsername}"/>
+        </div>
+        <div class="fund-login-field">
+            <span class="icon">&#128273;</span>
+            <input id="password" type="password" name="password" placeholder="Пароль" autocomplete="current-password" required/>
+        </div>
+        <p th:if="${error}" class="fund-login-error" th:text="${error}"></p>
+        <button type="submit" class="fund-login-submit">Вход</button>
+    </form>
+</div>
+</body>
+</html>

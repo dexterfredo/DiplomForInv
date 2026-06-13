@@ -54,9 +54,8 @@ public class PgRoutineCatalog {
         } catch (Exception e) {
             log.warn("pg_proc lookup {}: {}", routineName, e.getMessage());
         }
-        String fallback = preferredSchema + "." + routineName;
-        log.warn("pg_proc: {} не найден, fallback {}", routineName, fallback);
-        return new RoutineMeta(fallback, 'p');
+        throw new IllegalStateException(
+                "pg_proc: процедура " + routineName + " не найдена (схема " + preferredSchema + ")");
     }
 
     public record RoutineMeta(String qualifiedName, char prokind) {

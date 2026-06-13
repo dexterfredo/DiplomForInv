@@ -5,11 +5,7 @@ import org.postgresql.util.PGobject;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 
-/** Значение composite-типа PostgreSQL для вызова процедур. */
-public final class MicexPgComposite {
-
-    private MicexPgComposite() {
-    }
+public class MicexPgComposite {
 
     public static PGobject toPgObject(String pgCompositeType, Object[] attrs) throws SQLException {
         PGobject obj = new PGobject();

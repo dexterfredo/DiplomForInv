@@ -3,6 +3,8 @@ package ru.inversion.LoaderMicexFX.service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import ru.inversion.LoaderMicexFX.loaderconfig.TimerIntervalParser;
+import ru.inversion.LoaderMicexFX.model.BufferConfig;
+import ru.inversion.LoaderMicexFX.model.BufferTimerGroup;
 
 @Component
 public class LoaderTimerPreferences {
@@ -47,20 +49,16 @@ public class LoaderTimerPreferences {
         }
     }
 
-    /** Интервал записи в БД (сек) для каждого type_buff. */
-    public int getIntervalSecFor(int typeBuff, LoaderConstantsService constants) {
-        if (typeBuff == constants.buffMicexDeal()) {
-            return dealSeconds;
+    public int getIntervalSecFor(BufferConfig buff) {
+        if (buff == null) {
+            return 5;
         }
-        if (typeBuff == constants.buffMicexQuoteFx()) {
-            return quoteSeconds;
-        }
-        if (typeBuff == constants.buffMicexDecimal()
-                || typeBuff == constants.buffMicexBoard()
-                || typeBuff == constants.buffMicexLotsize()) {
-            return settingsSeconds;
-        }
-        return 5;
+        BufferTimerGroup group = buff.getTimerGroup();
+        return switch (group) {
+            case DEAL -> dealSeconds;
+            case QUOTE -> quoteSeconds;
+            case SETTINGS -> settingsSeconds;
+        };
     }
 
     public String formatDealTime() {
@@ -75,7 +73,6 @@ public class LoaderTimerPreferences {
         return TimerIntervalParser.formatSeconds(settingsSeconds);
     }
 
-    /** Галочка «Таймер сделок» на форме — только вкл/выкл поля интервала. */
     public boolean isDealTimerEnabled() {
         return dealTimerEnabled;
     }

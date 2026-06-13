@@ -6,10 +6,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 
-public final class MicexBuffStructBuilder {
-
-    private MicexBuffStructBuilder() {
-    }
+public class MicexBuffStructBuilder {
 
     public static Object[] buildAttributes(
             List<ViewColumnMeta> columns,
@@ -28,7 +25,6 @@ public final class MicexBuffStructBuilder {
         return attrs;
     }
 
-    /** Преобразование поля view в тип JDBC для процедуры. */
     private static Object toSqlValue(String dataType, String columnName, String raw) {
         raw = MicexValueNormalizer.normalize(raw);
         if (raw == null || raw.isBlank()) {

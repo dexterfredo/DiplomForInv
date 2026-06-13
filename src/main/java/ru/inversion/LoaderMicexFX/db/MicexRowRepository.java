@@ -87,7 +87,7 @@ public class MicexRowRepository {
         if (qualified.isBlank()) {
             return DbSaveOutcome.skipped("NO_PROCEDURE");
         }
-        if (buff.getTypeBuff() == loaderConstants.buffMicexDeal()) {
+        if (buff.isMultiLegDealSave()) {
             return DbSaveOutcome.skipped("USE_SAVE_DEAL_FX_CHUNK");
         }
 
@@ -109,7 +109,7 @@ public class MicexRowRepository {
         }
 
         MicexBuffStructBuilder.ensureDefaultDates(viewFields, columns);
-        MicexBuffDefaults.apply(buff, viewFields, tesystimeSyncService, loaderConstants);
+        MicexBuffDefaults.apply(buff, viewFields, tesystimeSyncService);
         String textPayload = resolveTextField(row, distinctRawMapping(mapping), viewFields);
         if (textPayload == null || textPayload.isBlank()) {
             return DbSaveOutcome.skipped("EMPTY_TEXT");
@@ -148,13 +148,11 @@ public class MicexRowRepository {
             }
             return DbSaveOutcome.saved(null);
         } catch (Exception e) {
-            log.warn("Ошибка вызова {}: {}", qualified, e.getMessage());
-            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return DbSaveOutcome.sqlError(msg);
+            log.warn("Ошибка вызова {}: {}", qualified, DbSaveDiagnosticsService.shortDbMessage(rootSqlMessage(e)));
+            return DbSaveOutcome.sqlError(rootSqlMessage(e), e);
         }
     }
 
-    
     public int saveDealFxChunk(BufferConfig buff, List<MicexTableRow> chunk, Predicate<MicexTableRow> mainRowFilter) {
         if (buff == null || chunk == null || chunk.isEmpty()) {
             return 0;
@@ -190,7 +188,6 @@ public class MicexRowRepository {
                 i++;
                 continue;
             }
-            // Вторая и третья нога сделки пока не заполняются
             Object[] attrsNear = buildDealFxLegAttributesFromMap(buff, columns, emptyLeg, mapping, "");
             Object[] attrsFar = buildDealFxLegAttributesFromMap(buff, columns, emptyLeg, mapping, "");
 
@@ -216,15 +213,16 @@ public class MicexRowRepository {
                 i++;
             } catch (Exception e) {
                 log.warn("DEAL_FX {}: {}", qualified, e.getMessage());
-                String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-                dbDiagnostics.recordOutcome(buff.getTypeBuff(), qualified, DbSaveOutcome.sqlError(msg));
+                dbDiagnostics.recordOutcome(
+                        buff.getTypeBuff(),
+                        qualified,
+                        DbSaveOutcome.sqlError(rootSqlMessage(e), e));
                 i++;
             }
         }
         return saved;
     }
 
-    
     private Object[] buildDealFxLegAttributes(
             BufferConfig buff,
             MicexTableRow row,
@@ -240,7 +238,7 @@ public class MicexRowRepository {
                     : buildDealFxLegAttributesFromMap(buff, columns, emptyLegViewFields(buff, mapping), mapping, "");
         }
         MicexBuffStructBuilder.ensureDefaultDates(viewFields, columns);
-        MicexBuffDefaults.apply(buff, viewFields, tesystimeSyncService, loaderConstants);
+        MicexBuffDefaults.apply(buff, viewFields, tesystimeSyncService);
         String textPayload = resolveTextField(row, rawMapping, viewFields);
         if (requireNonEmptyText && (textPayload == null || textPayload.isBlank())) {
             return null;
@@ -257,7 +255,7 @@ public class MicexRowRepository {
             String textPayload) {
         Map<String, String> copy = new LinkedHashMap<>(viewFields);
         MicexBuffStructBuilder.ensureDefaultDates(copy, columns);
-        MicexBuffDefaults.apply(buff, copy, tesystimeSyncService, loaderConstants);
+        MicexBuffDefaults.apply(buff, copy, tesystimeSyncService);
         return MicexBuffStructBuilder.buildAttributes(columns, copy, textPayload);
     }
 
@@ -306,12 +304,6 @@ public class MicexRowRepository {
             return "SELECT * FROM " + routine.qualifiedName() + "(?, ?, ?)";
         }
         return "CALL " + routine.qualifiedName() + "(?, ?, ?)";
-    }
-
-    /** Формат строки для тестов composite-типа. */
-    static String sqlCastComposite(Object[] attrs, String pgViewType) {
-        String body = MicexPgComposite.formatLiteral(attrs).replace("'", "''");
-        return "'" + body + "'::" + pgViewType;
     }
 
     private static String routineName(String qualified) {
@@ -417,5 +409,13 @@ public class MicexRowRepository {
         }
         String s = sb.toString();
         return s.length() > 4000 ? s.substring(0, 4000) : s;
+    }
+
+    private static String rootSqlMessage(Throwable e) {
+        if (e.getCause() != null) {
+            e = e.getCause();
+        }
+        String msg = e.getMessage();
+        return msg != null ? msg : e.getClass().getSimpleName();
     }
 }

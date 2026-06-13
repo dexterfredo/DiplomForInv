@@ -24,8 +24,7 @@ public class TesystimeSyncService {
     private int syncIntervalSec;
 
     private Instant lastSyncAt = Instant.EPOCH;
-
-    private volatile String micexSysTradeDate = "";
+    private String micexSysTradeDate = "";
 
     public TesystimeSyncService(OperDateRepository operDateRepository) {
         this.operDateRepository = operDateRepository;
@@ -40,11 +39,6 @@ public class TesystimeSyncService {
         return micexSysTradeDate;
     }
 
-    /** Вызывается раз в секунду из {@link ExchangeWorkerService#poll()}. */
-    public void onMasterTick() {
-        // счётчик секунд через lastSyncAt в processRows
-    }
-
     public void processRows(List<MicexTableRow> rows) {
         if (rows == null || rows.isEmpty()) {
             return;
@@ -55,21 +49,20 @@ public class TesystimeSyncService {
             if (!"TESYSTIME".equalsIgnoreCase(row.getTableName())) {
                 continue;
             }
-            String date = MicexDateFormats.normalizeTradeDate(extractField(row, "DATE"));
+            String date = MicexDateFormats.normalizeTradeDate(getField(row, "DATE"));
             if (date != null) {
                 micexSysTradeDate = date;
             }
             if (!dueByInterval && !row.isSnapshot()) {
                 continue;
             }
-            String time = MicexDateFormats.normalizeTime(extractField(row, "TIME"));
+            String time = MicexDateFormats.normalizeTime(getField(row, "TIME"));
             String operDateTime = buildOperDateTime(date, time);
             if (operDateTime == null) {
                 continue;
             }
             try {
                 operDateRepository.setOperDateTime(operDateTime);
-                log.debug("TESYSTIME set_oper_date_time({})", operDateTime);
                 lastSyncAt = Instant.now();
             } catch (Exception e) {
                 log.warn("set_oper_date_time: {}", e.getMessage());
@@ -87,24 +80,24 @@ public class TesystimeSyncService {
         return date;
     }
 
-    private static String extractField(MicexTableRow row, String key) {
-        Map<String, Object> f = row.getFields();
-        if (f == null) {
+    private static String getField(MicexTableRow row, String key) {
+        Map<String, Object> fields = row.getFields();
+        if (fields == null) {
             return null;
         }
-        Object v = f.get(key);
-        if (v == null) {
-            for (Map.Entry<String, Object> e : f.entrySet()) {
-                if (e.getKey() != null && key.equalsIgnoreCase(e.getKey())) {
-                    v = e.getValue();
+        Object value = fields.get(key);
+        if (value == null) {
+            for (Map.Entry<String, Object> entry : fields.entrySet()) {
+                if (entry.getKey() != null && key.equalsIgnoreCase(entry.getKey())) {
+                    value = entry.getValue();
                     break;
                 }
             }
         }
-        if (v == null) {
+        if (value == null) {
             return null;
         }
-        String s = String.valueOf(v).trim();
-        return s.isEmpty() ? null : s;
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
     }
 }

@@ -1,12 +1,10 @@
 package ru.inversion.LoaderMicexFX.model;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 public class ClientStatus {
+
     private boolean connected;
     private Instant startedAt;
     private Instant lastUpdateAt;
@@ -21,20 +19,12 @@ public class ClientStatus {
     private List<BufferStatusInfo> bufferStatuses = List.of();
     private int reconnectCount;
 
-    private final List<MarketData> lastEvents = new ArrayList<>();
-    private final Map<String, List<MarketData>> eventsByTable = new LinkedHashMap<>();
-
     public boolean isConnected() {
         return connected;
     }
 
     public void setConnected(boolean connected) {
         this.connected = connected;
-    }
-
-    /** Подключение к MICEX — можно запускать буферы. */
-    public boolean isSessionReady() {
-        return connected;
     }
 
     public Instant getStartedAt() {
@@ -131,34 +121,5 @@ public class ClientStatus {
 
     public void setReconnectCount(int reconnectCount) {
         this.reconnectCount = reconnectCount;
-    }
-
-    public List<MarketData> getLastEvents() {
-        return lastEvents;
-    }
-
-    public Map<String, List<MarketData>> getEventsByTable() {
-        return eventsByTable;
-    }
-
-    public void pushEventByTable(MarketData item, int maxPerTable) {
-        if (item == null) {
-            return;
-        }
-        int cap = maxPerTable > 0 ? maxPerTable : 50;
-        String key = item.getSourceTable();
-        if (key == null || key.isBlank()) {
-            key = "UNKNOWN";
-        }
-        List<MarketData> bucket = eventsByTable.computeIfAbsent(key, k -> new ArrayList<>());
-        bucket.add(0, item);
-        while (bucket.size() > cap) {
-            bucket.remove(bucket.size() - 1);
-        }
-    }
-
-    public void clearMonitorBuffers() {
-        lastEvents.clear();
-        eventsByTable.clear();
     }
 }

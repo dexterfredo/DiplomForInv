@@ -36,10 +36,6 @@ public class MicexTableSchemaRegistry {
         return fields == null ? List.of() : fields;
     }
 
-    public boolean hasSchema(String tableName) {
-        return tableName != null && byTable.containsKey(tableName.toUpperCase());
-    }
-
     private static List<FieldDef> readFields(Meta.Message message) {
         Object[] candidates = {
                 readMember(message, "fields"),

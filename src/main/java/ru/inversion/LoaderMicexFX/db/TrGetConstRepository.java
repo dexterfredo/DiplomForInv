@@ -21,62 +21,15 @@ public class TrGetConstRepository {
     }
 
     public int gcMmvbSectFx() {
-        return callFunction("gc_mmvb_sect_fx");
+        return call("tr_get_const.gc_mmvb_sect_fx()");
     }
 
     public int gcDealPlaceSectionState() {
-        return callFunction("gc_deal_place_section_state");
+        return call("tr_get_const.gc_deal_place_section_state()");
     }
 
     public int gcDealPlaceSectionShare() {
-        return callFunction("gc_deal_place_section_share");
-    }
-
-    public int callFunction(String functionName) {
-        return call("tr_get_const." + normalizeFunctionName(functionName) + "()");
-    }
-
-    static String normalizeFunctionName(String functionName) {
-        if (functionName == null || functionName.isBlank()) {
-            throw new IllegalArgumentException("Имя функции tr_get_const не задано");
-        }
-        String fn = functionName.trim().toLowerCase();
-        if (!fn.matches("gc_[a-z0-9_]+")) {
-            throw new IllegalArgumentException("Недопустимое имя функции tr_get_const: " + functionName);
-        }
-        return fn;
-    }
-
-    public int gcBuffMicexDeal() {
-        return call("tr_get_const.gc_buff_micex_deal()");
-    }
-
-    public int gcBuffMicexDealSec() {
-        return call("tr_get_const.gc_buff_micex_deal_sec()");
-    }
-
-    public int gcBuffMicexQuoteSec() {
-        return call("tr_get_const.gc_buff_micex_quote_sec()");
-    }
-
-    public int gcBuffMicexOrderSec() {
-        return call("tr_get_const.gc_buff_micex_order_sec()");
-    }
-
-    public int gcBuffMicexDecimal() {
-        return call("tr_get_const.gc_buff_micex_decimal()");
-    }
-
-    public int gcBuffMicexBoard() {
-        return call("tr_get_const.gc_buff_micex_board()");
-    }
-
-    public int gcBuffMicexQuoteFx() {
-        return call("tr_get_const.gc_buff_micex_quote_fx()");
-    }
-
-    public int gcBuffMicexLotsize() {
-        return call("tr_get_const.gc_buff_micex_lotsize()");
+        return call("tr_get_const.gc_deal_place_section_share()");
     }
 
     private int call(String sql) {
@@ -88,8 +41,7 @@ public class TrGetConstRepository {
             return n.intValue();
         } catch (Exception ex) {
             log.error("{}: {}", sql, ex.getMessage());
-            throw new IllegalStateException(
-                    "Выполните sql/generated/23_tr_get_const.sql: " + sql, ex);
+            throw new IllegalStateException("Ошибка " + sql + ": " + ex.getMessage(), ex);
         }
     }
 }

@@ -8,10 +8,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Состояние буфера: интервал записи и накопление строк с шлюза. */
 public class MicexBuffer {
 
-    /** Для котировок: обновление данных с шлюза раз в 5 сек, запись в БД — по своему интервалу. */
     public static final int QUOTE_LOAD_INTERVAL_SEC = 5;
 
     private final BufferConfig config;

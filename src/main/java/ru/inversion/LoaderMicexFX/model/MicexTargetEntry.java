@@ -4,9 +4,7 @@ public class MicexTargetEntry {
 
     private int typeSection;
     private int typeBuff;
-    
     private String field;
-    
     private String buffField;
     private String dbSource;
 

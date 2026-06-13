@@ -17,7 +17,7 @@ if not exist "%CD%\lib\mte-client-1.3.6.jar" goto err_lib
 set "MVN_OPTS=-DskipTests package"
 set "OFFLINE_FLAG="
 
-if exist "%CD%\maven-repository\org\springframework\boot\spring-boot-starter-parent\3.3.4\spring-boot-starter-parent-3.3.4.pom" (
+if exist "%CD%\maven-repository\org\springframework\boot\spring-boot-starter-parent\4.0.7\spring-boot-starter-parent-4.0.7.pom" (
   set "MVN_OPTS=-s settings-local.xml -o %MVN_OPTS%"
   set "OFFLINE_FLAG=1"
   echo Offline build: maven-repository
@@ -44,8 +44,8 @@ exit /b 0
 
 :err_java
 echo.
-echo [build.bat] JDK 17+ not found or JAVA_HOME is wrong.
-echo Install JDK 17 or 21, set JAVA_HOME to JDK root ^(without \bin^).
+echo [build.bat] JDK 21+ not found or JAVA_HOME is wrong.
+echo Install JDK 21+, set JAVA_HOME to JDK root ^(without \bin^).
 echo Example: setx JAVA_HOME "C:\Program Files\BellSoft\LibericaJDK-21"
 pause
 popd

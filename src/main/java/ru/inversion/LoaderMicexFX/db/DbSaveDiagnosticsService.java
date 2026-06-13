@@ -1,28 +1,30 @@
 package ru.inversion.LoaderMicexFX.db;
 
-import ru.inversion.LoaderMicexFX.monitoring.LoaderMetricsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import ru.inversion.LoaderMicexFX.model.DbErrorEntry;
 
-import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class DbSaveDiagnosticsService {
 
     private static final Logger log = LoggerFactory.getLogger(DbSaveDiagnosticsService.class);
+    private static final Logger errorsFile = LoggerFactory.getLogger("ru.inversion.LoaderMicexFX.errorsFile");
 
     private final JdbcTemplate jdbcTemplate;
-    private final LoaderMetricsService loaderMetrics;
-
     @Value("${app.loader.db.poll-enabled:true}")
     private boolean pollEnabled;
 
@@ -32,6 +34,9 @@ public class DbSaveDiagnosticsService {
     @Value("${app.loader.db.error-query:}")
     private String errorQuery;
 
+    @Value("${app.loader.db.error-history-size:100}")
+    private int errorHistorySize;
+
     private volatile String lastDbError;
     private volatile Instant lastDbErrorAt;
     private volatile String lastDbPollMessage;
@@ -40,24 +45,28 @@ public class DbSaveDiagnosticsService {
     private final ConcurrentHashMap<String, AtomicLong> skipCounters = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> recentBuffCounts = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Instant> lastWarnAt = new ConcurrentHashMap<>();
+    private final ConcurrentLinkedDeque<DbErrorEntry> recentErrors = new ConcurrentLinkedDeque<>();
 
-    public DbSaveDiagnosticsService(JdbcTemplate jdbcTemplate, LoaderMetricsService loaderMetrics) {
+    public DbSaveDiagnosticsService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
-        this.loaderMetrics = loaderMetrics;
     }
 
     public void recordOutcome(int typeBuff, String procedure, DbSaveOutcome outcome) {
         if (outcome == null) {
             return;
         }
-        loaderMetrics.recordSaveOutcome(typeBuff, outcome);
         switch (outcome.status()) {
             case SAVED -> clearDbErrorIfMatches(typeBuff);
             case SKIPPED -> {
                 bumpSkip(typeBuff, outcome.reason());
                 warnRateLimited(typeBuff, procedure, outcome.reason());
             }
-            case SQL_ERROR, PROC_ERROR -> setDbError(formatProc(typeBuff, procedure, outcome.reason()));
+            case SQL_ERROR, PROC_ERROR -> recordDbError(
+                    typeBuff,
+                    procedure,
+                    outcome.status().name(),
+                    outcome.reason(),
+                    outcome.stackTrace());
             default -> {
             }
         }
@@ -112,6 +121,10 @@ public class DbSaveDiagnosticsService {
         return lastDbPollAt;
     }
 
+    public List<DbErrorEntry> getRecentErrors() {
+        return Collections.unmodifiableList(new ArrayList<>(recentErrors));
+    }
+
     public Map<String, Object> snapshot() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("lastDbError", lastDbError);
@@ -122,7 +135,21 @@ public class DbSaveDiagnosticsService {
         m.put("lastDbPollAt", lastDbPollAt != null ? lastDbPollAt.toString() : null);
         m.put("pollCountQueryConfigured", pollCountQuery != null && !pollCountQuery.isBlank());
         m.put("errorQueryConfigured", errorQuery != null && !errorQuery.isBlank());
+        m.put("recentErrors", getRecentErrors().stream().map(this::errorToMap).toList());
         return m;
+    }
+
+    private Map<String, Object> errorToMap(DbErrorEntry e) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("at", e.getFirstAt() != null ? e.getFirstAt().toString() : null);
+        row.put("lastAt", e.getLastAt() != null ? e.getLastAt().toString() : null);
+        row.put("repeatCount", e.getRepeatCount());
+        row.put("typeBuff", e.getTypeBuff());
+        row.put("procedure", e.getProcedure());
+        row.put("status", e.getStatus());
+        row.put("message", e.getMessage());
+        row.put("stackTrace", e.getStackTrace());
+        return row;
     }
 
     @Scheduled(fixedDelayString = "${app.loader.db.poll-ms:30000}")
@@ -137,7 +164,7 @@ public class DbSaveDiagnosticsService {
     private void pollBuffCounts() {
         lastDbPollAt = Instant.now();
         if (pollCountQuery == null || pollCountQuery.isBlank()) {
-            lastDbPollMessage = "poll-count-query не задан (на чужой БД укажите свой SQL в config/application.properties)";
+            lastDbPollMessage = "poll-count-query не задан";
             return;
         }
         try {
@@ -173,7 +200,7 @@ public class DbSaveDiagnosticsService {
                 return rs.getString(1);
             });
             if (msg != null && !msg.isBlank()) {
-                setDbError("poll: " + msg);
+                recordDbError(0, "poll", "POLL_ERROR", msg, null);
             }
         } catch (Exception e) {
             log.debug("DB error-query: {}", rootMessage(e));
@@ -196,10 +223,39 @@ public class DbSaveDiagnosticsService {
         log.warn("DB skip: buff {} {} — {}", typeBuff, procedure == null ? "" : procedure, reason);
     }
 
-    private void setDbError(String message) {
-        lastDbError = message;
-        lastDbErrorAt = Instant.now();
-        log.warn("DB: {}", message);
+    private synchronized void recordDbError(
+            int typeBuff,
+            String procedure,
+            String status,
+            String message,
+            String stackTrace) {
+        String proc = procedure == null || procedure.isBlank() ? "?" : procedure;
+        String summary = formatProc(typeBuff, proc, shortDbMessage(message));
+        Instant now = Instant.now();
+        lastDbError = summary;
+        lastDbErrorAt = now;
+
+        DbErrorEntry head = recentErrors.peekFirst();
+        if (head != null && head.matches(typeBuff, proc, status, message)) {
+            head.bump(now);
+            return;
+        }
+
+        log.warn("DB: {}", summary);
+        if (stackTrace != null && !stackTrace.isBlank()) {
+            errorsFile.warn("DB stack (buff {}):\n{}", typeBuff, stackTrace);
+        } else if (message != null && !message.isBlank() && !message.equals(shortDbMessage(message))) {
+            errorsFile.warn("DB detail (buff {}): {}", typeBuff, message);
+        }
+        recentErrors.addFirst(new DbErrorEntry(now, typeBuff, proc, status, shortDbMessage(message), stackTrace));
+        trimErrorHistory();
+    }
+
+    private void trimErrorHistory() {
+        int max = Math.max(10, errorHistorySize);
+        while (recentErrors.size() > max) {
+            recentErrors.pollLast();
+        }
     }
 
     private void clearDbErrorIfMatches(int typeBuff) {
@@ -215,18 +271,34 @@ public class DbSaveDiagnosticsService {
     }
 
     private static String rootMessage(Throwable e) {
-        Throwable t = e;
-        while (t.getCause() != null && t.getCause() != t) {
-            t = t.getCause();
+        if (e.getCause() != null) {
+            e = e.getCause();
         }
-        if (t instanceof SQLException sql) {
-            String sqlState = sql.getSQLState();
-            if (sqlState != null && !sqlState.isBlank()) {
-                String msg = sql.getMessage();
-                return msg != null && !msg.isBlank() ? msg + " [SQLState=" + sqlState + "]" : sqlState;
+        String msg = e.getMessage();
+        return msg != null ? msg : e.getClass().getSimpleName();
+    }
+
+    static String shortDbMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return "?";
+        }
+        int errorIdx = message.indexOf("ERROR:");
+        if (errorIdx >= 0) {
+            String part = message.substring(errorIdx);
+            int nl = part.indexOf('\n');
+            if (nl > 0) {
+                part = part.substring(0, nl);
             }
+            int where = part.indexOf("  Где:");
+            if (where > 0) {
+                part = part.substring(0, where);
+            }
+            return part.trim();
         }
-        String msg = t.getMessage();
-        return msg != null && !msg.isBlank() ? msg : t.getClass().getSimpleName();
+        int nl = message.indexOf('\n');
+        if (nl > 0) {
+            return message.substring(0, nl).trim();
+        }
+        return message.trim();
     }
 }

@@ -5,7 +5,10 @@ import ru.inversion.LoaderMicexFX.db.BufferConfigRepository;
 import ru.inversion.LoaderMicexFX.db.MicexTargetRepository;
 import ru.inversion.LoaderMicexFX.model.BufferConfig;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class BufferConfigService {
@@ -38,8 +41,8 @@ public class BufferConfigService {
         targetRepository.reload();
     }
 
-    public java.util.Set<String> getMicexTableNames() {
-        java.util.Set<String> set = new java.util.HashSet<>();
+    public Set<String> getMicexTableNames() {
+        Set<String> set = new HashSet<>();
         for (BufferConfig c : getActiveBuffers()) {
             if (c.getMicexTable() != null) {
                 set.add(c.getMicexTable().trim().toUpperCase());
@@ -68,6 +71,55 @@ public class BufferConfigService {
             }
         }
         return repository.loadByTypeBuff(typeBuff);
+    }
+
+    public Optional<BufferConfig> findDealBuffer() {
+        return getActiveBuffers().stream()
+                .filter(BufferConfig::isMultiLegDealSave)
+                .findFirst();
+    }
+
+    public Optional<BufferConfig> findPrimaryQuoteBuffer() {
+        if (loaderConstants.isMmvSectionSecurityMarket()) {
+            return getActiveBuffers().stream()
+                    .filter(BufferConfig::isSecQuoteBuffer)
+                    .findFirst();
+        }
+        return getActiveBuffers().stream()
+                .filter(BufferConfig::isFxQuoteBuffer)
+                .findFirst();
+    }
+
+    public BufferConfig findFxQuoteBuffer() {
+        for (BufferConfig c : getActiveBuffers()) {
+            if (c.isFxQuoteBuffer()) {
+                return c;
+            }
+        }
+        return repository.loadByFunctionContains("FX_QUOTE");
+    }
+
+    public BufferConfig findSecQuoteBuffer() {
+        for (BufferConfig c : getActiveBuffers()) {
+            if (c.isSecQuoteBuffer()) {
+                return c;
+            }
+        }
+        return repository.loadByFunctionContains("SEC_QUOTE");
+    }
+
+    public Optional<BufferConfig> findDecimalBuffer() {
+        return getActiveBuffers().stream().filter(BufferConfig::isDecimalBuffer).findFirst();
+    }
+
+    public Optional<BufferConfig> findBoardBuffer() {
+        return getActiveBuffers().stream().filter(BufferConfig::isBoardBuffer).findFirst();
+    }
+
+    public List<BufferConfig> findMasterBuffers() {
+        return getActiveBuffers().stream()
+                .filter(b -> b.isDealBuffer() || b.isQuoteBuffer())
+                .toList();
     }
 
     public int getTypeSrc() {

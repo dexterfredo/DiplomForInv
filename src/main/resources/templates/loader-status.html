@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+
+    <th:block th:replace="~{fragments/layout :: pageHead('Состояние — ФОНД')}"/>
+
+</head>
+
+<body class="fund-app">
+
+<header class="fund-header">
+
+    <div th:replace="~{fragments/layout :: topbar(navActive='status')}"></div>
+
+</header>
+
+
+
+<main class="fund-shell fund-main">
+
+    <div class="fund-page-head fund-page-head--status">
+
+        <h1 class="fund-page-title">
+
+            Состояние загрузчика:
+
+            <span th:if="${status.connected}" class="state-on">Включён</span>
+
+            <span th:unless="${status.connected}" class="state-off">Выключен</span>
+
+        </h1>
+
+        <div class="fund-page-actions">
+
+            <form th:if="${!status.connected}" th:action="@{/connect}" method="post" id="connectFormQuick">
+
+                <th:block th:replace="~{fragments/layout :: csrf}"/>
+
+                <input type="hidden" name="returnTo" value="/loader"/>
+
+                <input type="hidden" name="connectionType" value="TCP2"/>
+
+                <input type="hidden" name="loadDecimals" class="h-decimals" th:value="${ui.loadDecimals} ? 'true' : 'false'"/>
+
+                <input type="hidden" name="loadBoards" class="h-boards" th:value="${ui.loadBoards} ? 'true' : 'false'"/>
+
+                <input type="hidden" name="dealTime" th:value="${ui.dealTime}"/>
+
+                <input type="hidden" name="quoteTime" th:value="${ui.quoteTime}"/>
+
+                <input type="hidden" name="settingsTime" th:value="${ui.settingsTime}"/>
+
+                <input type="hidden" name="dealTimerEnabled" th:value="${ui.dealTimerEnabled}"/>
+
+                <button type="submit" class="fund-btn fund-btn-primary">Старт</button>
+
+            </form>
+
+            <form th:unless="${!status.connected}" th:action="@{/disconnect}" method="post">
+
+                <th:block th:replace="~{fragments/layout :: csrf}"/>
+
+                <input type="hidden" name="returnTo" value="/loader"/>
+
+                <button type="submit" class="fund-btn fund-btn-outline">Стоп</button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</main>
+
+</body>
+
+</html>
+

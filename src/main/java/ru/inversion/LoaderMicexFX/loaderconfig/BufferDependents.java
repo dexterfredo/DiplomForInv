@@ -1,35 +1,32 @@
 package ru.inversion.LoaderMicexFX.loaderconfig;
 
+import ru.inversion.LoaderMicexFX.model.BufferConfig;
+
 import java.util.ArrayList;
 import java.util.List;
 
-public final class BufferDependents {
+public class BufferDependents {
 
-    private BufferDependents() {
-    }
-
-    /**
-     * FX (6246): deal → board + decimal (без 6181, lotsize в 5886).
-     * Фондовый рынок: deal → board + decimal + lotsize (как MicexBufferParams).
-     */
-    public static List<Integer> forMaster(
-            int masterTypeBuff,
-            int deal,
-            int quote,
-            int board,
-            int decimal,
-            int lotsize,
-            boolean includeLotsize) {
-        if (masterTypeBuff == deal) {
-            List<Integer> deps = new ArrayList<>(List.of(board, decimal));
-            if (includeLotsize) {
-                deps.add(lotsize);
+    public static List<Integer> forMaster(BufferConfig master, List<BufferConfig> all, boolean includeLotsize) {
+        if (master == null || all == null || all.isEmpty()) {
+            return List.of();
+        }
+        if (!master.isDealBuffer() && !master.isQuoteBuffer()) {
+            return List.of();
+        }
+        List<Integer> deps = new ArrayList<>();
+        for (BufferConfig b : all) {
+            if (b.isBoardBuffer() || b.isDecimalBuffer()) {
+                deps.add(b.getTypeBuff());
             }
-            return deps;
         }
-        if (masterTypeBuff == quote) {
-            return List.of(board, decimal);
+        if (master.isDealBuffer() && includeLotsize) {
+            for (BufferConfig b : all) {
+                if (b.isLotsizeBuffer()) {
+                    deps.add(b.getTypeBuff());
+                }
+            }
         }
-        return List.of();
+        return deps;
     }
 }

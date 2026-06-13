@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{fragments/layout :: pageHead('Данные — ФОНД')}"/>
+    <meta http-equiv="refresh" content="10"/>
+</head>
+<body class="fund-app">
+<header class="fund-header">
+    <div th:replace="~{fragments/layout :: topbar(navActive='data')}"></div>
+</header>
+
+<main class="fund-shell fund-main">
+    <h1 class="fund-page-title fund-page-title--spaced">Данные загрузки</h1>
+
+    <h2 class="fund-section-title">Статистика</h2>
+    <div class="fund-stats">
+        <div class="fund-stat-item">
+            <div class="label">Шлюз</div>
+            <div class="value" th:if="${status.connected}" style="color:#43a047;font-size:15px">Подключён</div>
+            <div class="value" th:unless="${status.connected}" style="color:#78909c;font-size:15px">Нет</div>
+        </div>
+        <div class="fund-stat-item">
+            <div class="label">Записано в БД</div>
+            <div class="value" th:text="${status.totalMessages}">0</div>
+        </div>
+        <div class="fund-stat-item">
+            <div class="label">Сделки FX</div>
+            <div class="value" th:text="${ui.dealStarted} ? 'Запущены' : 'Остановлены'">—</div>
+        </div>
+        <div class="fund-stat-item">
+            <div class="label">Котировки FX</div>
+            <div class="value" th:text="${ui.quoteStarted} ? 'Запущены' : 'Остановлены'">—</div>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/errors :: dbErrors('Ошибки БД')}"></div>
+</main>
+</body>
+</html>
